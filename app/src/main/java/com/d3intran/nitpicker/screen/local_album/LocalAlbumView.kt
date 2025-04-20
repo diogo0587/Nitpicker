@@ -1,0 +1,625 @@
+package com.d3intran.nitpicker.screen.local_album
+
+import android.graphics.drawable.ColorDrawable
+import android.util.Log
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
+import com.d3intran.nitpicker.model.FileType
+import com.d3intran.nitpicker.model.LocalFileItem
+import com.d3intran.nitpicker.screen.files.FolderItem
+import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class, ExperimentalFoundationApi::class)
+@Composable
+fun LocalAlbumScreen(
+    navController: NavController,
+    viewModel: LocalAlbumViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val gridState = rememberLazyGridState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    var showNormalActionMenu by remember { mutableStateOf(false) }
+    var showSelectionActionMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showMoveDialog by remember { mutableStateOf(false) }
+    var moveTargetFolders by remember { mutableStateOf<List<FolderItem>>(emptyList()) }
+
+    BackHandler(enabled = uiState.isSelectionModeActive) {
+        Log.d("BackHandler", "Back pressed in selection mode, exiting selection.")
+        viewModel.exitSelectionMode()
+        showSelectionActionMenu = false
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.snackbarMessages.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        Log.d("CompositionLifecycle", "LocalAlbumScreen Composed for path: ${uiState.folderPath}")
+        onDispose {
+            Log.d("CompositionLifecycle", "LocalAlbumScreen Disposed for path: ${uiState.folderPath}")
+        }
+    }
+    Log.d("LocalAlbumScreenState", "Recomposing. isLoading: ${uiState.isLoading}, error: ${uiState.error}, files: ${uiState.files.size}")
+
+    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+    val columnCount = remember(windowSizeClass) {
+        val windowWidth = windowSizeClass.minWidthDp
+        val windowHeight = windowSizeClass.minHeightDp
+        val isLandscape = windowWidth > windowHeight
+        when {
+            windowWidth >= 840 -> if (isLandscape) 6 else 4
+            windowWidth >= 600 -> if (isLandscape) 4 else 3
+            else -> if (isLandscape) 4 else 2
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            if (uiState.isSelectionModeActive) {
+                SelectionTopAppBar(
+                    selectedCount = uiState.selectedFileCount,
+                    onCancelClick = {
+                        Log.d("SelectionTopAppBar", "Cancel clicked, exiting selection.")
+                        viewModel.exitSelectionMode()
+                        showSelectionActionMenu = false
+                    },
+                    onActionMenuClick = { showSelectionActionMenu = !showSelectionActionMenu },
+                    showMenu = showSelectionActionMenu,
+                    onDismissMenu = { showSelectionActionMenu = false },
+                    onSelectAllClick = { viewModel.selectAll(); showSelectionActionMenu = false },
+                    onMoveClick = {
+                        showSelectionActionMenu = false
+                        scope.launch {
+                            moveTargetFolders = viewModel.getFoldersForMove()
+                            if (moveTargetFolders.isNotEmpty()) {
+                                showMoveDialog = true
+                            } else {
+                                snackbarHostState.showSnackbar("No other folders available to move to.")
+                            }
+                        }
+                    },
+                    onDeleteClick = { showDeleteConfirmDialog = true; showSelectionActionMenu = false }
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = uiState.folderName.ifEmpty { "Local Files" },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { showNormalActionMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More Actions")
+                            }
+                            DropdownMenu(
+                                expanded = showNormalActionMenu,
+                                onDismissRequest = { showNormalActionMenu = false },
+                                modifier = Modifier.background(Color(0xFF2C2C2C))
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Select", color = Color.White) },
+                                    onClick = {
+                                        viewModel.enterSelectionMode()
+                                        showNormalActionMenu = false
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = "Select", tint = Color.White) }
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFF1E1E1E),
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White,
+                        actionIconContentColor = Color.White
+                    )
+                )
+            }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        containerColor = Color(0xFF121212)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 8.dp)
+        ) {
+            Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
+                when {
+                    uiState.isLoading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = Color(0xFF6D28D9))
+                        }
+                    }
+                    uiState.error != null -> {
+                        LocalErrorState(
+                            errorMessage = uiState.error ?: "An unknown error occurred.",
+                            onRetry = { viewModel.retry() }
+                        )
+                    }
+                    uiState.files.isEmpty() && !uiState.isLoading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "No images or videos found in this folder.",
+                                color = Color(0xFFAAAAAA),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                    else -> {
+                        val videoFiles = uiState.files
+                            .filter { it.type == FileType.VIDEO }
+                            .sortedBy { it.name }
+
+                        LocalFilesGrid(
+                            files = uiState.files,
+                            gridState = gridState,
+                            columnCount = columnCount,
+                            isSelectionModeActive = uiState.isSelectionModeActive,
+                            selectedFilePaths = uiState.selectedFilePaths,
+                            onFileClick = { file ->
+                                if (uiState.isSelectionModeActive) {
+                                    viewModel.toggleSelection(file.path)
+                                } else {
+                                    when (file.type) {
+                                        FileType.VIDEO -> {
+                                            val initialIndex = videoFiles.indexOfFirst { it.path == file.path }
+                                            if (initialIndex != -1) {
+                                                Log.d("LocalAlbumScreen", "Navigating to player for folder: ${uiState.folderPath}, index: $initialIndex (sorted list)")
+                                                val encodedFolderPath = try {
+                                                    URLEncoder.encode(uiState.folderPath, StandardCharsets.UTF_8.toString())
+                                                } catch (e: Exception) {
+                                                    Log.e("Navigation", "Failed to encode folder path: ${uiState.folderPath}", e)
+                                                    ""
+                                                }
+                                                if (encodedFolderPath.isNotEmpty()) {
+                                                    navController.navigate("player_screen/$encodedFolderPath/$initialIndex")
+                                                } else {
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar("Could not open video player.")
+                                                    }
+                                                }
+                                            } else {
+                                                Log.e("LocalAlbumScreen", "Clicked video not found in filtered list: ${file.path}")
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar("Error finding video index.")
+                                                }
+                                            }
+                                        }
+                                        FileType.IMAGE -> {
+                                            Log.d("LocalAlbumScreen", "Clicked on image (view mode): ${file.name}")
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("Image viewer not implemented yet.")
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onFileLongClick = { file ->
+                                if (!uiState.isSelectionModeActive) {
+                                    viewModel.enterSelectionMode()
+                                }
+                                viewModel.toggleSelection(file.path)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeleteConfirmDialog) {
+        DeleteConfirmationDialog(
+            count = uiState.selectedFileCount,
+            onDismiss = { showDeleteConfirmDialog = false },
+            onConfirm = {
+                showDeleteConfirmDialog = false
+                viewModel.deleteSelectedFiles()
+            }
+        )
+    }
+
+    if (showMoveDialog) {
+        MoveTargetDialog(
+            folders = moveTargetFolders,
+            onDismiss = { showMoveDialog = false },
+            onConfirm = { destinationFolder ->
+                showMoveDialog = false
+                scope.launch {
+                    viewModel.moveSelectedFiles(destinationFolder.path)
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SelectionTopAppBar(
+    selectedCount: Int,
+    onCancelClick: () -> Unit,
+    onActionMenuClick: () -> Unit,
+    showMenu: Boolean,
+    onDismissMenu: () -> Unit,
+    onSelectAllClick: () -> Unit,
+    onMoveClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    TopAppBar(
+        title = { Text("$selectedCount selected") },
+        navigationIcon = {
+            IconButton(onClick = onCancelClick) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel Selection")
+            }
+        },
+        actions = {
+            Box {
+                IconButton(onClick = onActionMenuClick) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Actions")
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = onDismissMenu,
+                    modifier = Modifier.background(Color(0xFF2C2C2C))
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Select All", color = Color.White) },
+                        onClick = onSelectAllClick,
+                        leadingIcon = { Icon(Icons.Default.SelectAll, contentDescription = null, tint = Color.White) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Move", color = if (selectedCount > 0) Color.White else Color.Gray) },
+                        onClick = onMoveClick,
+                        enabled = selectedCount > 0,
+                        leadingIcon = { Icon(Icons.Default.DriveFileMove, contentDescription = null, tint = if (selectedCount > 0) Color.White else Color.Gray) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = if (selectedCount > 0) Color(0xFFF44336) else Color.Gray) },
+                        onClick = onDeleteClick,
+                        enabled = selectedCount > 0,
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = if (selectedCount > 0) Color(0xFFF44336) else Color.Gray) }
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color(0xFF1E1E1E),
+            titleContentColor = Color.White,
+            navigationIconContentColor = Color.White,
+            actionIconContentColor = Color.White
+        )
+    )
+}
+
+@Composable
+fun LocalFilesGrid(
+    files: List<LocalFileItem>,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    columnCount: Int,
+    isSelectionModeActive: Boolean,
+    selectedFilePaths: Set<String>,
+    onFileClick: (LocalFileItem) -> Unit,
+    onFileLongClick: (LocalFileItem) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columnCount),
+        state = gridState,
+        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(files, key = { it.path }) { file ->
+            val isSelected = selectedFilePaths.contains(file.path)
+            LocalFileItemRow(
+                fileInfo = file,
+                isSelected = isSelected,
+                onClick = { onFileClick(file) },
+                onLongClick = { onFileLongClick(file) }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LocalFileItemRow(
+    fileInfo: LocalFileItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val cardShape = RoundedCornerShape(8.dp)
+    val context = LocalContext.current
+    val placeholderPainter = remember { ColorPainter(Color(0xFF3A3A3A)) }
+    val errorPainter = remember { ColorPainter(Color(0xFF555555)) }
+
+    val borderColor = if (isSelected) Color(0xFF6D28D9) else Color.Transparent
+    val borderWidth = if (isSelected) 2.dp else 0.dp
+
+    Card(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .clip(cardShape)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .border(
+                width = borderWidth,
+                color = borderColor,
+                shape = cardShape
+            ),
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = rememberAsyncImagePainter(
+                    model = ImageRequest.Builder(context)
+                        .data(fileInfo.thumbnailUri ?: fileInfo.path)
+                        .crossfade(true)
+                        .placeholder(ColorDrawable(android.graphics.Color.DKGRAY))
+                        .error(ColorDrawable(android.graphics.Color.GRAY))
+                        .build(),
+                    placeholder = placeholderPainter,
+                    error = errorPainter
+                ),
+                contentDescription = fileInfo.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.6f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = fileInfo.name,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = formatFileSize(fileInfo.size),
+                            color = Color(0xFFAAAAAA),
+                            fontSize = 10.sp,
+                            maxLines = 1
+                        )
+                    }
+
+                    if (fileInfo.type == FileType.VIDEO && fileInfo.durationMillis != null && fileInfo.durationMillis > 0) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formatDuration(fileInfo.durationMillis),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.End
+                        )
+                    }
+                }
+            }
+
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = Color(0xFF6D28D9),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(20.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.2f))
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DeleteConfirmationDialog(
+    count: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Files") },
+        text = { Text("Are you sure you want to permanently delete $count selected file(s)? This action cannot be undone.") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete", color = Color(0xFFF44336))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        containerColor = Color(0xFF2A2A2A),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFAAAAAA)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MoveTargetDialog(
+    folders: List<FolderItem>,
+    onDismiss: () -> Unit,
+    onConfirm: (FolderItem) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Move to Folder") },
+        text = {
+            if (folders.isEmpty()) {
+                Text("No other folders available.", color = Color(0xFFAAAAAA))
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(items = folders, key = { folder -> folder.path }) { folder ->
+                        ListItem(
+                            headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
+                            modifier = Modifier.clickable { onConfirm(folder) },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent,
+                                headlineColor = Color.White,
+                                leadingIconColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {}) { }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        containerColor = Color(0xFF2A2A2A),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFAAAAAA)
+    )
+}
+
+fun formatDuration(millis: Long): String {
+    val hours = TimeUnit.MILLISECONDS.toHours(millis)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % TimeUnit.HOURS.toMinutes(1)
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % TimeUnit.MINUTES.toSeconds(1)
+
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
+    }
+}
+
+fun formatFileSize(sizeBytes: Long): String {
+    if (sizeBytes <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    val digitGroups = (Math.log10(sizeBytes.toDouble()) / Math.log10(1024.0)).toInt()
+    return String.format("%.1f %s", sizeBytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+@Composable
+fun LocalErrorState(errorMessage: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Warning,
+            contentDescription = null,
+            tint = Color(0xFFAAAAAA),
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Error Loading Folder",
+            color = Color.White,
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = errorMessage,
+            color = Color(0xFFAAAAAA),
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9))
+        ) {
+            Text("Retry")
+        }
+    }
+}

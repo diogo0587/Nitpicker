@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "nitpicker"
+rootProject.name = "com.d3intran.nitpicker"
 include(":app")

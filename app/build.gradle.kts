@@ -9,15 +9,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.nitpicker"
+    namespace = "com.d3intran.nitpicker"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.nitpicker"
+        applicationId = "com.d3intran.nitpicker"
         minSdk = 30
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
