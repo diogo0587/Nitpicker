@@ -1,6 +1,7 @@
 package com.example.nitpicker
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -30,13 +31,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.nitpicker.screen.album.AlbumScreen
 import com.example.nitpicker.screen.download.DownloadScreen
 import com.example.nitpicker.screen.home.HomeViewModel
 import com.example.nitpicker.ui.screens.HomeScreen
+import com.example.nitpicker.screen.files.FilesScreen
+import com.example.nitpicker.screen.local_album.LocalAlbumScreen
 import com.example.nitpicker.ui.theme.NitpickerTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -49,15 +54,38 @@ class MainActivity : ComponentActivity() {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
 
+                // Shared state for navigation debounce
+                var lastNavTime by remember { mutableStateOf(0L) }
+                val debounceDelay = 500L // 防抖延迟 (毫秒), 可调整
+
+                // Add listener for navigation changes
+                LaunchedEffect(navController) {
+                    navController.addOnDestinationChangedListener { controller, destination, arguments ->
+                        Log.d("NavigationFlow", "Navigated to: ${destination.route}")
+                    }
+                }
+
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
+                // Log route and drawer state on recomposition
+                Log.d("NavigationFlow", "Recomposed - Route: $currentRoute, Drawer: ${drawerState.currentValue}")
+
+                // Determine if the drawer gesture should be enabled
+                val gesturesEnabled = true // Only enable on home screen
 
                 val configuration = LocalConfiguration.current
-                val screenWidth = configuration.screenWidthDp.dp
-                val drawerWidth = screenWidth * 0.7f
+                val screenWidthDp = configuration.screenWidthDp.dp
+                val screenHeightDp = configuration.screenHeightDp.dp
+
+                val drawerWidth = if (screenWidthDp > screenHeightDp) {
+                    screenWidthDp * 0.5f
+                } else {
+                    screenWidthDp * 0.7f
+                }
 
                 ModalNavigationDrawer(
                     drawerState = drawerState,
+                    gesturesEnabled = gesturesEnabled, // Control gesture based on route
                     drawerContent = {
                         ModalDrawerSheet(
                             modifier = Modifier
@@ -72,7 +100,21 @@ class MainActivity : ComponentActivity() {
                                 route = "home_screen",
                                 currentRoute = currentRoute,
                                 navController = navController,
-                                closeDrawer = { scope.launch { drawerState.close() } }
+                                closeDrawer = {
+                                    Log.d("DrawerAction", "[${System.currentTimeMillis()}] DrawerItem: Requesting drawer close. Current Drawer State: ${drawerState.currentValue}")
+                                    scope.launch {
+                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.close()")
+                                        try {
+                                            drawerState.close()
+                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.close() completed.")
+                                        } catch (e: Exception) {
+                                            Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error closing drawer", e)
+                                        }
+                                    }
+                                },
+                                lastNavTime = lastNavTime, // Pass state
+                                debounceDelay = debounceDelay, // Pass delay
+                                updateLastNavTime = { newTime -> lastNavTime = newTime } // Pass update lambda
                             )
                             DrawerItem(
                                 label = "Downloads",
@@ -80,7 +122,21 @@ class MainActivity : ComponentActivity() {
                                 route = "download_screen",
                                 currentRoute = currentRoute,
                                 navController = navController,
-                                closeDrawer = { scope.launch { drawerState.close() } }
+                                closeDrawer = {
+                                    Log.d("DrawerAction", "[${System.currentTimeMillis()}] DrawerItem: Requesting drawer close. Current Drawer State: ${drawerState.currentValue}")
+                                    scope.launch {
+                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.close()")
+                                        try {
+                                            drawerState.close()
+                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.close() completed.")
+                                        } catch (e: Exception) {
+                                            Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error closing drawer", e)
+                                        }
+                                    }
+                                },
+                                lastNavTime = lastNavTime,
+                                debounceDelay = debounceDelay,
+                                updateLastNavTime = { newTime -> lastNavTime = newTime }
                             )
                             DrawerItem(
                                 label = "Files",
@@ -88,8 +144,21 @@ class MainActivity : ComponentActivity() {
                                 route = "files_screen",
                                 currentRoute = currentRoute,
                                 navController = navController,
-                                closeDrawer = { scope.launch { drawerState.close() } },
-                                navigateOnClick = false
+                                closeDrawer = {
+                                    Log.d("DrawerAction", "[${System.currentTimeMillis()}] DrawerItem: Requesting drawer close. Current Drawer State: ${drawerState.currentValue}")
+                                    scope.launch {
+                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.close()")
+                                        try {
+                                            drawerState.close()
+                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.close() completed.")
+                                        } catch (e: Exception) {
+                                            Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error closing drawer", e)
+                                        }
+                                    }
+                                },
+                                lastNavTime = lastNavTime,
+                                debounceDelay = debounceDelay,
+                                updateLastNavTime = { newTime -> lastNavTime = newTime }
                             )
                         }
                     }
@@ -105,8 +174,15 @@ class MainActivity : ComponentActivity() {
                                     navController = navController,
                                     homeViewModel = homeViewModel,
                                     openDrawer = {
+                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] HomeScreen: Menu icon clicked. Current Drawer State: ${drawerState.currentValue}")
                                         scope.launch {
-                                            drawerState.open()
+                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.open()")
+                                            try {
+                                                drawerState.open()
+                                                Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.open() completed.")
+                                            } catch (e: Exception) {
+                                                Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error opening drawer", e)
+                                            }
                                         }
                                     }
                                 )
@@ -126,9 +202,15 @@ class MainActivity : ComponentActivity() {
                                 DownloadScreen(navController = navController)
                             }
                             composable("files_screen") {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Files Screen (Not Implemented)", color = Color.White)
-                                }
+                                FilesScreen(navController = navController)
+                            }
+                            composable(
+                                route = "local_album_screen/{folderPath}",
+                                arguments = listOf(
+                                    navArgument("folderPath") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                LocalAlbumScreen(navController = navController)
                             }
                         }
                     }
@@ -147,7 +229,11 @@ fun DrawerItem(
     currentRoute: String?,
     navController: NavHostController,
     closeDrawer: () -> Unit,
-    navigateOnClick: Boolean = true
+    navigateOnClick: Boolean = true,
+    // Debounce parameters
+    lastNavTime: Long,
+    debounceDelay: Long,
+    updateLastNavTime: (Long) -> Unit
 ) {
     val isSelected = currentRoute == route
     NavigationDrawerItem(
@@ -155,15 +241,26 @@ fun DrawerItem(
         label = { Text(label) },
         selected = isSelected,
         onClick = {
-            closeDrawer()
-            if (navigateOnClick && currentRoute != route) {
-                navController.navigate(route) {
-                    popUpTo(navController.graph.startDestinationId) {
-                        saveState = true
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastNavTime > debounceDelay) { // Check debounce time
+                updateLastNavTime(currentTime) // Update last navigation time
+
+                closeDrawer() // Close drawer first
+
+                if (navigateOnClick && currentRoute != route) {
+                    Log.d("DrawerNav", "[${currentTime}] Debounced Navigating to '$route'")
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
                     }
-                    launchSingleTop = true
-                    restoreState = true
+                } else {
+                    Log.d("DrawerNav", "[${currentTime}] Skipping nav (already on route or !navigateOnClick)")
                 }
+            } else {
+                Log.d("DrawerNav", "[${currentTime}] Skipping nav (debounced)")
             }
         },
         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),

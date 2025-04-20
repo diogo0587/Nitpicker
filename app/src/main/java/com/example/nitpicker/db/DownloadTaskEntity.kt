@@ -13,8 +13,10 @@ data class DownloadTaskEntity(
     @PrimaryKey val id: String, // Use the same ID as DownloadFileInfo/DownloadProgress
     val fileName: String,
     val fileType: String,
+    val sourcePageUrl: String,
     val downloadPageUrl: String, // Referer URL
-    val fileUrl: String,         // Direct download URL
+    val fileUrl: String,
+    val thumbnailUrl: String,          // Direct download URL
     val albumTitle: String,
     val totalBytes: Long = 0L,
     val downloadedBytes: Long = 0L,

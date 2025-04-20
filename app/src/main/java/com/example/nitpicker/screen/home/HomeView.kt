@@ -1,5 +1,6 @@
 package com.example.nitpicker.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -38,7 +39,16 @@ fun HomeScreen(
     navController: NavController,
     openDrawer: () -> Unit
 ) {
+    // Log composition start and end
+    DisposableEffect(Unit) {
+        Log.d("CompositionLifecycle", "HomeScreen Composed")
+        onDispose {
+            Log.d("CompositionLifecycle", "HomeScreen Disposed")
+        }
+    }
+
     val uiState by homeViewModel.uiState.collectAsState()
+    Log.d("HomeScreenState", "Recomposing HomeScreen. isLoading: ${uiState.isLoading}, error: ${uiState.error}, albums: ${uiState.albums.size}") // Log state on recomposition
     val searchText by homeViewModel.searchText.collectAsState()
 
     Surface(
@@ -59,7 +69,10 @@ fun HomeScreen(
             ) {
                 // Menu Icon Button - Top Left
                 IconButton(
-                    onClick = openDrawer,
+                    onClick = {
+                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] HomeScreen: IconButton onClick triggered.")
+                        openDrawer() // Call the lambda passed from MainActivity
+                    },
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     Icon(
@@ -178,7 +191,7 @@ fun HomeScreen(
                                     containerColor = Color(0xFF6D28D9)
                                 )
                             ) {
-                                Text("重试")
+                                Text("retry")
                             }
                         }
                     }
@@ -200,9 +213,13 @@ fun HomeScreen(
                         // 显示专辑列表
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            items(uiState.albums) { album ->
+                            items(
+                                items = uiState.albums,
+                                key = { album -> album.url } // 添加 key，使用 album.url 作为唯一标识符
+                            ) { album ->
                                 AlbumItem(album = album, onAlbumClick = { clickedAlbum ->
                                     // Encode URL and Title to be safe navigation arguments
                                     val encodedUrl = java.net.URLEncoder.encode(clickedAlbum.url, "UTF-8")

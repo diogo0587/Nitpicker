@@ -18,6 +18,13 @@ class DownloadViewModel @Inject constructor(
         downloadManagerService.cancelDownload(downloadId)
     }
 
-    // Add retry logic if needed
-    // fun retryDownload(downloadId: String) { ... }
+    // 新增：调用 Service 删除任务
+    fun deleteCompletedAndCancelledTasks() {
+        downloadManagerService.deleteCompletedAndCancelledTasks()
+    }
+
+    // 新增：调用 Service 重试任务
+    fun retryDownload(downloadId: String) {
+        downloadManagerService.retryDownload(downloadId)
+    }
 }

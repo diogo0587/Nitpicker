@@ -41,37 +41,38 @@ class HomeViewModel @Inject constructor(
      */
     fun searchAlbums() {
         val query = _searchText.value.trim()
-        if (query.isEmpty()) return
-        
+        if (query.isEmpty()) {
+             _uiState.update { it.copy(
+                 error = "Please enter an artist name to search.",
+                 albums = emptyList(),
+                 currentPage = 0,
+                 totalPages = 0,
+                 isLoading = false
+             ) }
+            return
+        }
+
         viewModelScope.launch {
             try {
-                // 更新状态为加载中
-                _uiState.update { it.copy(
-                    isLoading = true,
-                    error = null
-                ) }
-                
-                // 执行搜索
-                val (albums, totalPages) = repository.searchAlbums(query)
-                
-                // 记录搜索日志
+                _uiState.update { it.copy(isLoading = true, error = null) }
+                val (albums, totalPages) = repository.searchAlbums(query) // This can now throw IOException
                 Log.d("HomeViewModel", "搜索结果: ${albums.size} 个专辑, 总页数: $totalPages")
-                
-                // 更新状态
                 _uiState.update { it.copy(
                     albums = albums,
                     currentPage = 1,
                     totalPages = totalPages,
-                    isLoading = false
+                    isLoading = false,
+                    error = null // Clear error on success
                 ) }
-            } catch (e: Exception) {
-                // 记录错误日志
-                Log.e("HomeViewModel", "搜索失败", e)
-                
-                // 处理错误
+            } catch (e: Exception) { // Catch Exception to handle IOException and others
+                Log.e("HomeViewModel", "搜索失败 for query: $query", e)
                 _uiState.update { it.copy(
-                    error = e.localizedMessage ?: "搜索失败",
-                    isLoading = false
+                    // Use a more user-friendly message or the exception message
+                    error = e.localizedMessage ?: "Search failed. Check connection or query.",
+                    isLoading = false,
+                    albums = emptyList(), // Clear albums on search error
+                    currentPage = 0,      // Reset pagination on search error
+                    totalPages = 0
                 ) }
             }
         }
@@ -81,31 +82,35 @@ class HomeViewModel @Inject constructor(
      * 加载指定页的专辑
      */
     fun loadPage(page: Int) {
+        // Ensure page is valid before attempting load
+        if (page <= 0 || page > uiState.value.totalPages) {
+            Log.w("HomeViewModel", "Attempted to load invalid page: $page")
+            return
+        }
         val artist = repository.getLastSearchArtist()
-        if (artist.isEmpty()) return
-        
+        if (artist.isEmpty()) {
+             Log.w("HomeViewModel", "Cannot load page, last search artist is empty.")
+             _uiState.update { it.copy(error = "Cannot load page, perform a search first.") }
+            return
+        }
+
         viewModelScope.launch {
             try {
-                // 更新状态为加载中
-                _uiState.update { it.copy(
-                    isLoading = true,
-                    error = null
-                ) }
-                
-                // 获取指定页的专辑
-                val albums = repository.getAlbumsByPage(artist, page)
-                
-                // 更新状态
+                _uiState.update { it.copy(isLoading = true, error = null) }
+                val albums = repository.getAlbumsByPage(artist, page) // This can now throw IOException
                 _uiState.update { it.copy(
                     albums = albums,
                     currentPage = page,
-                    isLoading = false
+                    isLoading = false,
+                    error = null // Clear error on success
                 ) }
-            } catch (e: Exception) {
-                // 处理错误
+            } catch (e: Exception) { // Catch Exception
+                Log.e("HomeViewModel", "加载页面 $page 失败 for artist: $artist", e)
                 _uiState.update { it.copy(
-                    error = e.localizedMessage ?: "加载失败",
+                    // Provide specific error for page load failure
+                    error = e.localizedMessage ?: "Failed to load page $page. Check connection.",
                     isLoading = false
+                    // Keep previous albums displayed when a page load fails
                 ) }
             }
         }
@@ -115,10 +120,15 @@ class HomeViewModel @Inject constructor(
      * 重试上次失败的操作
      */
     fun retry() {
-        if (uiState.value.currentPage > 0) {
+        // Clear the error before retrying
+        _uiState.update { it.copy(error = null) }
+        // Decide whether to retry search or page load based on current state
+        if (uiState.value.currentPage > 0 && repository.getLastSearchArtist().isNotEmpty()) {
             loadPage(uiState.value.currentPage)
-        } else {
+        } else if (searchText.value.isNotEmpty()){
             searchAlbums()
+        } else {
+             _uiState.update { it.copy(error = "Nothing to retry. Please search first.") }
         }
     }
 }

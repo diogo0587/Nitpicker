@@ -45,6 +45,13 @@ import android.content.ContextWrapper
 import androidx.compose.material3.adaptive.currentWindowSize
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import kotlinx.coroutines.launch
+import android.util.Log
 
 // Helper function to find Activity from Context safely
 private fun Context.findActivity(): Activity? = when (this) {
@@ -65,6 +72,10 @@ fun AlbumScreen(
 
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
+
+    // State for back navigation debounce
+    var isNavigatingBack by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         albumViewModel.snackbarMessages.collectLatest { message ->
@@ -97,7 +108,32 @@ fun AlbumScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(
+                        onClick = {
+                            // Prevent multiple clicks
+                            if (!isNavigatingBack) {
+                                isNavigatingBack = true // Set flag immediately
+                                Log.d("NavigationFlow", "[${System.currentTimeMillis()}] AlbumScreen: Back button clicked. Calling popBackStack().")
+                                // Launch in a coroutine
+                                scope.launch {
+                                    try {
+                                        val popped = navController.popBackStack()
+                                        Log.d("NavigationFlow", "[${System.currentTimeMillis()}] AlbumScreen: navController.popBackStack() called. Result: $popped")
+                                        if (!popped) {
+                                            isNavigatingBack = false // Reset if pop failed
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("NavigationFlow", "[${System.currentTimeMillis()}] AlbumScreen: Error calling popBackStack()", e)
+                                        isNavigatingBack = false // Reset on error
+                                    }
+                                }
+                            } else {
+                                Log.d("NavigationFlow", "[${System.currentTimeMillis()}] AlbumScreen: Back button clicked but navigation already in progress.")
+                            }
+                        },
+                        // Disable button while navigating back
+                        enabled = !isNavigatingBack
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },

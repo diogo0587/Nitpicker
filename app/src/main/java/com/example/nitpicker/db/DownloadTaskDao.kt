@@ -19,7 +19,15 @@ interface DownloadTaskDao {
 
     @Query("SELECT * FROM download_tasks WHERE status NOT IN ('Completed', 'Cancelled', 'Error')") // Example: Get active tasks
     suspend fun getActiveTasks(): List<DownloadTaskEntity>
+    
+        // 新增：更新获取到的URL和状态
+    @Query("UPDATE download_tasks SET downloadPageUrl = :downloadPageUrl, fileUrl = :fileUrl, status = :status WHERE id = :id")
+    suspend fun updateTaskUrlsAndStatus(id: String, downloadPageUrl: String, fileUrl: String, status: DownloadStatus)
 
+    // 新增：仅更新获取到的URL (如果状态由其他逻辑管理)
+    @Query("UPDATE download_tasks SET downloadPageUrl = :downloadPageUrl, fileUrl = :fileUrl WHERE id = :id")
+    suspend fun updateTaskUrls(id: String, downloadPageUrl: String, fileUrl: String)
+    
     @Query("UPDATE download_tasks SET status = :status, downloadedBytes = :downloadedBytes, totalBytes = :totalBytes, error = :error WHERE id = :id")
     suspend fun updateTaskProgress(id: String, status: DownloadStatus, downloadedBytes: Long, totalBytes: Long, error: String?)
 
@@ -31,6 +39,10 @@ interface DownloadTaskDao {
 
     @Query("DELETE FROM download_tasks WHERE id = :id")
     suspend fun deleteTaskById(id: String)
+
+    // 新增：删除所有已完成或已取消的任务
+    @Query("DELETE FROM download_tasks WHERE status IN ('Completed', 'Cancelled')")
+    suspend fun deleteCompletedAndCancelled()
 
     // Add other queries as needed (e.g., delete completed)
 }

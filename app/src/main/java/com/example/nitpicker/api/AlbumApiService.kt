@@ -24,50 +24,46 @@ class AlbumApiService @Inject constructor(
 
     /**
      * 首次搜索专辑，返回专辑列表和总页数
+     * throws IOException if network fails or response is not successful
      */
     suspend fun firstSearch(artist: String): Pair<List<Album>, Int> = withContext(Dispatchers.IO) {
         lastSearchArtist = artist
         val url = "https://bunkr-albums.io/?search=$artist"
         val request = createRequest(url)
 
-        try {
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                throw IOException("Request failed with status: ${response.code}")
-            }
-            val body = response.body?.string() ?: throw IOException("Empty response body")
-            val document = Jsoup.parse(body)
-            val albums = extractAlbums(document)
-            val maxPage = extractMaxPage(document)
-            Pair(albums, maxPage)
-        } catch (e: IOException) {
-            println("Error during firstSearch: ${e.message}")
-            Pair(emptyList(), 0)
+        val response = client.newCall(request).execute() // Let this throw IOException
+        if (!response.isSuccessful) {
+            // Throw exception with status code for better error info in ViewModel
+            throw IOException("Request failed with status: ${response.code} ${response.message}")
         }
+        val body = response.body?.string() ?: throw IOException("Empty response body")
+        val document = Jsoup.parse(body)
+        val albums = extractAlbums(document)
+        val maxPage = extractMaxPage(document)
+        Pair(albums, maxPage)
     }
 
     /**
      * 获取指定页的专辑
+     * throws IOException if network fails or response is not successful
      */
     suspend fun getAlbumsByPage(artist: String, page: Int): List<Album> = withContext(Dispatchers.IO) {
         val url = "https://bunkr-albums.io/?search=$artist&page=$page"
         val request = createRequest(url)
-        try {
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                throw IOException("Request failed with status: ${response.code}")
-            }
-            val body = response.body?.string() ?: throw IOException("Empty response body")
-            val document = Jsoup.parse(body)
-            extractAlbums(document)
-        } catch (e: IOException) {
-            println("Error during getAlbumsByPage: ${e.message}")
-            emptyList()
+
+        val response = client.newCall(request).execute() // Let this throw IOException
+        if (!response.isSuccessful) {
+            // Throw exception with status code
+            throw IOException("Request failed for page $page with status: ${response.code} ${response.message}")
         }
+        val body = response.body?.string() ?: throw IOException("Empty response body for page $page")
+        val document = Jsoup.parse(body)
+        extractAlbums(document)
     }
 
     /**
      * 获取指定专辑URL的文件信息列表
+     * (Keeping try-catch here for now, but ideally should also propagate errors)
      */
     suspend fun getFileInfo(albumUrl: String): List<FileInfo> = withContext(Dispatchers.IO) {
         val fullUrl = if (albumUrl.startsWith("http")) albumUrl else "https://bunkr-albums.io$albumUrl"
@@ -76,7 +72,9 @@ class AlbumApiService @Inject constructor(
         try {
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
-                throw IOException("Request failed for file info with status: ${response.code}")
+                // Consider throwing here too for consistency
+                println("Request failed for file info with status: ${response.code}")
+                return@withContext emptyList()
             }
             val body = response.body?.string() ?: throw IOException("Empty response body for file info")
             val document = Jsoup.parse(body)
