@@ -17,6 +17,9 @@ import java.io.File
 import java.io.IOException // Add import
 import javax.inject.Inject
 
+class FolderAlreadyExistsException(message: String) : IOException(message)
+class InvalidFolderNameException(message: String) : IllegalArgumentException(message)
+
 // Keep FolderItem data class
 data class FolderItem(
     val name: String,
@@ -76,6 +79,69 @@ class FilesViewModel @Inject constructor(
             }
             // No finally needed as isLoading is set within update calls
         }
+    }
+
+    // Function to create a new folder
+    suspend fun createFolder(folderName: String) { // Make it suspend if not already
+        val trimmedName = folderName.trim()
+        // Basic validation - throw specific exception
+        if (trimmedName.isBlank() || trimmedName.contains("/") || trimmedName.contains("\\")) {
+            throw InvalidFolderNameException("Invalid characters in name or name is empty.")
+        }
+
+        try {
+            val downloadDir = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            if (downloadDir == null || !downloadDir.exists() || !downloadDir.isDirectory) {
+                throw IOException("Download directory not accessible.") // Keep throwing for general IO errors
+            }
+
+            val newFolder = File(downloadDir, trimmedName)
+
+            // Check if file/folder already exists - throw specific exception
+            if (newFolder.exists()) {
+                throw FolderAlreadyExistsException("Folder '$trimmedName' already exists.")
+            }
+
+            // Attempt to create the directory
+            val success = withContext(Dispatchers.IO) {
+                newFolder.mkdir()
+            }
+
+            if (success) {
+                Log.d("FilesViewModel", "Created folder: '${newFolder.absolutePath}'")
+                // Reload folders to show the new one - Keep this on success
+                // Launching loadFolders in a new coroutine to avoid blocking the createFolder result
+                viewModelScope.launch { loadFolders() }
+            } else {
+                // Throw general IO error if mkdir fails for unknown reasons
+                throw IOException("Failed to create folder. Check storage permissions.")
+            }
+
+        } catch (e: SecurityException) {
+            Log.e("FilesViewModel", "Permission denied during folder creation", e)
+            // Update global error state for permission issues
+            _uiState.update { it.copy(error = "Permission denied during folder creation.", isLoading = false) }
+            throw e // Re-throw if needed, or handle differently
+        } catch (e: IOException) {
+            // Catch specific exceptions first if they are IOExceptions
+            if (e is FolderAlreadyExistsException || e is InvalidFolderNameException) {
+                throw e // Re-throw our specific exceptions
+            }
+            // Handle other IO errors globally
+            Log.e("FilesViewModel", "IO error during folder creation", e)
+            _uiState.update { it.copy(error = "Create folder failed: ${e.message}", isLoading = false) }
+            throw e // Re-throw if needed
+        } catch (e: Exception) {
+             // Catch our specific exceptions if they are not IOExceptions
+            if (e is InvalidFolderNameException) {
+                 throw e // Re-throw our specific exceptions
+            }
+            // Handle other unexpected errors globally
+            Log.e("FilesViewModel", "Unexpected error during folder creation", e)
+            _uiState.update { it.copy(error = "An unexpected error occurred.", isLoading = false) }
+            throw e // Re-throw if needed
+        }
+        // No finally block needed to reset isLoading as it's handled by loadFolders or error updates
     }
 
     // Function to rename a folder

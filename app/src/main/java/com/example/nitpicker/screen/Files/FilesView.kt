@@ -8,8 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Folder // Icon for folders
-import androidx.compose.material.icons.filled.MoreVert // Import for menu icon (optional)
+import androidx.compose.material.icons.filled.Add // Import Add icon
+import androidx.compose.material.icons.filled.Folder // Icon for folders/ Import for menu icon (optional)
 import androidx.compose.material3.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -43,7 +43,7 @@ import androidx.compose.material3.TextButton // Add for Dialog buttons
 import androidx.compose.foundation.border // Add import for border
 import androidx.compose.material3.OutlinedTextFieldDefaults // Add import for TextField colors
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class) // Add ExperimentalFoundationApi
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun FilesScreen(
     navController: NavController,
@@ -66,6 +66,10 @@ fun FilesScreen(
     // State for delete confirmation dialog
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var folderToDelete by remember { mutableStateOf<FolderItem?>(null) }
+
+    // State for create folder dialog
+    var showCreateFolderDialog by remember { mutableStateOf(false) }
+    var createFolderDialogError by remember { mutableStateOf<String?>(null) }
 
     // Log composition lifecycle
     DisposableEffect(Unit) {
@@ -114,10 +118,23 @@ fun FilesScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    IconButton(onClick = {
+                        createFolderDialogError = null // Clear previous error when opening dialog
+                        showCreateFolderDialog = true
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Create Folder",
+                            tint = Color.White // Ensure icon is visible
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFF1E1E1E),
                     titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                    navigationIconContentColor = Color.White,
+                    actionIconContentColor = Color.White // Ensure action icons are white
                 )
             )
         },
@@ -263,6 +280,30 @@ fun FilesScreen(
                 viewModel.deleteFolder(folderToDelete!!.path)
                 showDeleteConfirmDialog = false
                 folderToDelete = null
+            }
+        )
+    }
+
+    // Create Folder Dialog (triggered by TopAppBar action)
+    if (showCreateFolderDialog) {
+        CreateFolderDialog(
+            dialogError = createFolderDialogError,
+            onDismiss = { showCreateFolderDialog = false },
+            onConfirm = { newFolderName ->
+                scope.launch {
+                    try {
+                        createFolderDialogError = null // Clear error before attempting
+                        viewModel.createFolder(newFolderName)
+                        showCreateFolderDialog = false // Close dialog on success
+                    } catch (e: FolderAlreadyExistsException) {
+                        createFolderDialogError = e.message
+                    } catch (e: InvalidFolderNameException) {
+                        createFolderDialogError = e.message
+                    } catch (e: Exception) {
+                        Log.e("FilesScreen", "Error creating folder: ${e.message}", e)
+                        showCreateFolderDialog = false // Close dialog on other errors
+                    }
+                }
             }
         )
     }
@@ -450,6 +491,87 @@ fun DeleteConfirmationDialog(
             ) {
                 // Use red color for confirmation button text
                 Text("Delete", color = Color(0xFFF44336), fontSize = 16.sp)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text("Cancel", fontSize = 16.sp)
+            }
+        },
+        containerColor = Color(0xFF2A2A2A),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFAAAAAA)
+    )
+}
+
+// Composable for the Create Folder Dialog
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CreateFolderDialog(
+    dialogError: String?, // Receive the specific error message
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var folderName by remember { mutableStateOf("") }
+    var textFieldError by remember { mutableStateOf<String?>(null) }
+    val combinedError = dialogError ?: textFieldError // Prioritize external error
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Create New Folder") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = folderName,
+                    onValueChange = {
+                        folderName = it
+                        textFieldError = if (it.isBlank()) {
+                            "Name cannot be empty"
+                        } else {
+                            null
+                        }
+                    },
+                    label = { Text("Folder name") },
+                    singleLine = true,
+                    isError = combinedError != null,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color(0xFF6D28D9),
+                        focusedBorderColor = Color(0xFF6D28D9),
+                        unfocusedBorderColor = Color.Gray,
+                        focusedLabelColor = Color.White,
+                        unfocusedLabelColor = Color.Gray,
+                        errorBorderColor = MaterialTheme.colorScheme.error,
+                        errorLabelColor = MaterialTheme.colorScheme.error
+                    )
+                )
+                if (combinedError != null) {
+                    Text(
+                        text = combinedError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (textFieldError == null && folderName.isNotBlank()) {
+                        onConfirm(folderName.trim())
+                    } else if (folderName.isBlank()) {
+                        textFieldError = "Name cannot be empty"
+                    }
+                },
+                enabled = folderName.isNotBlank(),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text("Create", fontSize = 16.sp)
             }
         },
         dismissButton = {

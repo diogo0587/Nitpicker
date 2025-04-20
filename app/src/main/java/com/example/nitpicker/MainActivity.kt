@@ -38,10 +38,13 @@ import com.example.nitpicker.screen.home.HomeViewModel
 import com.example.nitpicker.ui.screens.HomeScreen
 import com.example.nitpicker.screen.files.FilesScreen
 import com.example.nitpicker.screen.local_album.LocalAlbumScreen
+import com.example.nitpicker.screen.player.PlayerScreen
 import com.example.nitpicker.ui.theme.NitpickerTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -211,6 +214,12 @@ class MainActivity : ComponentActivity() {
                                 )
                             ) { backStackEntry ->
                                 LocalAlbumScreen(navController = navController)
+                            }
+                            composable(
+                                route = "player_screen/{videoPath}",
+                                arguments = listOf(navArgument("videoPath") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                PlayerScreen(navController = navController)
                             }
                         }
                     }

@@ -2,11 +2,15 @@ package com.example.nitpicker.screen.local_album
 
 import android.graphics.drawable.ColorDrawable
 import android.util.Log
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -15,10 +19,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BrokenImage // Placeholder for missing thumb
-import androidx.compose.material.icons.filled.Videocam // Placeholder for video
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.*
@@ -26,8 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -35,18 +49,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.nitpicker.model.FileType
 import com.example.nitpicker.model.LocalFileItem
+import com.example.nitpicker.screen.files.FolderItem
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun LocalAlbumScreen(
     navController: NavController,
@@ -54,12 +72,27 @@ fun LocalAlbumScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
-
-    // State for back navigation debounce
-    var isNavigatingBack by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Log composition lifecycle
+    var showNormalActionMenu by remember { mutableStateOf(false) }
+    var showSelectionActionMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showMoveDialog by remember { mutableStateOf(false) }
+    var moveTargetFolders by remember { mutableStateOf<List<FolderItem>>(emptyList()) }
+
+    BackHandler(enabled = uiState.isSelectionModeActive) {
+        Log.d("BackHandler", "Back pressed in selection mode, exiting selection.")
+        viewModel.exitSelectionMode()
+        showSelectionActionMenu = false
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.snackbarMessages.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
     DisposableEffect(Unit) {
         Log.d("CompositionLifecycle", "LocalAlbumScreen Composed for path: ${uiState.folderPath}")
         onDispose {
@@ -67,7 +100,6 @@ fun LocalAlbumScreen(
         }
     }
     Log.d("LocalAlbumScreenState", "Recomposing. isLoading: ${uiState.isLoading}, error: ${uiState.error}, files: ${uiState.files.size}")
-
 
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val columnCount = remember(windowSizeClass) {
@@ -83,59 +115,85 @@ fun LocalAlbumScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = uiState.folderName.ifEmpty { "Local Files" },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            // Prevent multiple clicks
-                            if (!isNavigatingBack) {
-                                isNavigatingBack = true // Set flag immediately
-                                Log.d("NavigationFlow", "[${System.currentTimeMillis()}] LocalAlbumScreen: Back button clicked. Calling popBackStack().")
-                                scope.launch {
-                                    try {
-                                        val popped = navController.popBackStack()
-                                        Log.d("NavigationFlow", "[${System.currentTimeMillis()}] LocalAlbumScreen: navController.popBackStack() called. Result: $popped")
-                                        if (!popped) isNavigatingBack = false
-                                    } catch (e: Exception) {
-                                        Log.e("NavigationFlow", "[${System.currentTimeMillis()}] LocalAlbumScreen: Error calling popBackStack()", e)
-                                        isNavigatingBack = false
-                                    }
-                                }
+            if (uiState.isSelectionModeActive) {
+                SelectionTopAppBar(
+                    selectedCount = uiState.selectedFileCount,
+                    onCancelClick = {
+                        Log.d("SelectionTopAppBar", "Cancel clicked, exiting selection.")
+                        viewModel.exitSelectionMode()
+                        showSelectionActionMenu = false
+                    },
+                    onActionMenuClick = { showSelectionActionMenu = !showSelectionActionMenu },
+                    showMenu = showSelectionActionMenu,
+                    onDismissMenu = { showSelectionActionMenu = false },
+                    onSelectAllClick = { viewModel.selectAll(); showSelectionActionMenu = false },
+                    onMoveClick = {
+                        showSelectionActionMenu = false
+                        scope.launch {
+                            moveTargetFolders = viewModel.getFoldersForMove()
+                            if (moveTargetFolders.isNotEmpty()) {
+                                showMoveDialog = true
                             } else {
-                                Log.d("NavigationFlow", "[${System.currentTimeMillis()}] LocalAlbumScreen: Back button clicked but navigation already in progress.")
+                                snackbarHostState.showSnackbar("No other folders available to move to.")
                             }
-                        },
-                        enabled = !isNavigatingBack
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                // No actions for now
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF1E1E1E),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+                        }
+                    },
+                    onDeleteClick = { showDeleteConfirmDialog = true; showSelectionActionMenu = false }
                 )
-            )
+            } else {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = uiState.folderName.ifEmpty { "Local Files" },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        Box {
+                            IconButton(onClick = { showNormalActionMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More Actions")
+                            }
+                            DropdownMenu(
+                                expanded = showNormalActionMenu,
+                                onDismissRequest = { showNormalActionMenu = false },
+                                modifier = Modifier.background(Color(0xFF2C2C2C))
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Select", color = Color.White) },
+                                    onClick = {
+                                        viewModel.enterSelectionMode()
+                                        showNormalActionMenu = false
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = "Select", tint = Color.White) }
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFF1E1E1E),
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White,
+                        actionIconContentColor = Color.White
+                    )
+                )
+            }
         },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         containerColor = Color(0xFF121212)
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 8.dp) // Consistent padding
+                .padding(horizontal = 8.dp)
         ) {
-            // No FilterControls needed for local view initially
-
-            Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) { // Add top padding
+            Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
                 when {
                     uiState.isLoading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -143,12 +201,12 @@ fun LocalAlbumScreen(
                         }
                     }
                     uiState.error != null -> {
-                        LocalErrorState( // Use a specific error state if needed, or reuse AlbumView's
+                        LocalErrorState(
                             errorMessage = uiState.error ?: "An unknown error occurred.",
                             onRetry = { viewModel.retry() }
                         )
                     }
-                    uiState.files.isEmpty() -> {
+                    uiState.files.isEmpty() && !uiState.isLoading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "No images or videos found in this folder.",
@@ -162,9 +220,43 @@ fun LocalAlbumScreen(
                             files = uiState.files,
                             gridState = gridState,
                             columnCount = columnCount,
+                            isSelectionModeActive = uiState.isSelectionModeActive,
+                            selectedFilePaths = uiState.selectedFilePaths,
                             onFileClick = { file ->
-                                Log.d("LocalAlbumScreen", "Clicked on local file: ${file.name}")
-                                // No action for now
+                                if (uiState.isSelectionModeActive) {
+                                    viewModel.toggleSelection(file.path)
+                                } else {
+                                    when (file.type) {
+                                        FileType.VIDEO -> {
+                                            Log.d("LocalAlbumScreen", "Navigating to player for: ${file.path}")
+                                            val encodedPath = try {
+                                                URLEncoder.encode(file.path, StandardCharsets.UTF_8.toString())
+                                            } catch (e: Exception) {
+                                                Log.e("Navigation", "Failed to encode video path: ${file.path}", e)
+                                                ""
+                                            }
+                                            if (encodedPath.isNotEmpty()) {
+                                                navController.navigate("player_screen/$encodedPath")
+                                            } else {
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar("Could not open video.")
+                                                }
+                                            }
+                                        }
+                                        FileType.IMAGE -> {
+                                            Log.d("LocalAlbumScreen", "Clicked on image (view mode): ${file.name}")
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("Image viewer not implemented yet.")
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onFileLongClick = { file ->
+                                if (!uiState.isSelectionModeActive) {
+                                    viewModel.enterSelectionMode()
+                                }
+                                viewModel.toggleSelection(file.path)
                             }
                         )
                     }
@@ -172,6 +264,88 @@ fun LocalAlbumScreen(
             }
         }
     }
+
+    if (showDeleteConfirmDialog) {
+        DeleteConfirmationDialog(
+            count = uiState.selectedFileCount,
+            onDismiss = { showDeleteConfirmDialog = false },
+            onConfirm = {
+                showDeleteConfirmDialog = false
+                viewModel.deleteSelectedFiles()
+            }
+        )
+    }
+
+    if (showMoveDialog) {
+        MoveTargetDialog(
+            folders = moveTargetFolders,
+            onDismiss = { showMoveDialog = false },
+            onConfirm = { destinationFolder ->
+                showMoveDialog = false
+                scope.launch {
+                    viewModel.moveSelectedFiles(destinationFolder.path)
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SelectionTopAppBar(
+    selectedCount: Int,
+    onCancelClick: () -> Unit,
+    onActionMenuClick: () -> Unit,
+    showMenu: Boolean,
+    onDismissMenu: () -> Unit,
+    onSelectAllClick: () -> Unit,
+    onMoveClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    TopAppBar(
+        title = { Text("$selectedCount selected") },
+        navigationIcon = {
+            IconButton(onClick = onCancelClick) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel Selection")
+            }
+        },
+        actions = {
+            Box {
+                IconButton(onClick = onActionMenuClick) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Actions")
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = onDismissMenu,
+                    modifier = Modifier.background(Color(0xFF2C2C2C))
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Select All", color = Color.White) },
+                        onClick = onSelectAllClick,
+                        leadingIcon = { Icon(Icons.Default.SelectAll, contentDescription = null, tint = Color.White) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Move", color = if (selectedCount > 0) Color.White else Color.Gray) },
+                        onClick = onMoveClick,
+                        enabled = selectedCount > 0,
+                        leadingIcon = { Icon(Icons.Default.DriveFileMove, contentDescription = null, tint = if (selectedCount > 0) Color.White else Color.Gray) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = if (selectedCount > 0) Color(0xFFF44336) else Color.Gray) },
+                        onClick = onDeleteClick,
+                        enabled = selectedCount > 0,
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = if (selectedCount > 0) Color(0xFFF44336) else Color.Gray) }
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color(0xFF1E1E1E),
+            titleContentColor = Color.White,
+            navigationIconContentColor = Color.White,
+            actionIconContentColor = Color.White
+        )
+    )
 }
 
 @Composable
@@ -179,73 +353,80 @@ fun LocalFilesGrid(
     files: List<LocalFileItem>,
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
     columnCount: Int,
-    onFileClick: (LocalFileItem) -> Unit
+    isSelectionModeActive: Boolean,
+    selectedFilePaths: Set<String>,
+    onFileClick: (LocalFileItem) -> Unit,
+    onFileLongClick: (LocalFileItem) -> Unit
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(columnCount),
         state = gridState,
-        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp), // Consistent padding
+        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         items(files, key = { it.path }) { file ->
+            val isSelected = selectedFilePaths.contains(file.path)
             LocalFileItemRow(
                 fileInfo = file,
-                onClick = { onFileClick(file) }
+                isSelected = isSelected,
+                onClick = { onFileClick(file) },
+                onLongClick = { onFileLongClick(file) }
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LocalFileItemRow(
     fileInfo: LocalFileItem,
-    onClick: () -> Unit
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val cardShape = RoundedCornerShape(8.dp)
-
-    // Determine placeholder icon based on type
-    val placeholderIcon: ImageVector = when(fileInfo.type) {
-        FileType.IMAGE -> Icons.Filled.BrokenImage
-        FileType.VIDEO -> Icons.Filled.Videocam
-        else -> Icons.Filled.BrokenImage
-    }
-    // Create the Painter here
-    val placeholderPainter = rememberVectorPainter(image = placeholderIcon)
-
-    // Get context within the @Composable scope
     val context = LocalContext.current
+    val placeholderPainter = remember { ColorPainter(Color(0xFF3A3A3A)) }
+    val errorPainter = remember { ColorPainter(Color(0xFF555555)) }
+
+    val borderColor = if (isSelected) Color(0xFF6D28D9) else Color.Transparent
+    val borderWidth = if (isSelected) 2.dp else 0.dp
 
     Card(
         modifier = Modifier
             .aspectRatio(1f)
             .clip(cardShape)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .border(
+                width = borderWidth,
+                color = borderColor,
+                shape = cardShape
+            ),
         shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Create the ImageRequest using the captured context
-            val imageRequest = remember(context, fileInfo.thumbnailUri, fileInfo.path) { // Optionally add context as a key
-                ImageRequest.Builder(context) // Use the context variable here
-                    .data(fileInfo.thumbnailUri ?: fileInfo.path)
-                    .crossfade(true)
-                    .build()
-            }
-
             Image(
                 painter = rememberAsyncImagePainter(
-                    model = imageRequest,
+                    model = ImageRequest.Builder(context)
+                        .data(fileInfo.thumbnailUri ?: fileInfo.path)
+                        .crossfade(true)
+                        .placeholder(ColorDrawable(android.graphics.Color.DKGRAY))
+                        .error(ColorDrawable(android.graphics.Color.GRAY))
+                        .build(),
                     placeholder = placeholderPainter,
-                    error = placeholderPainter
+                    error = errorPainter
                 ),
                 contentDescription = fileInfo.name,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit // Change from Crop to Fit
+                contentScale = ContentScale.Fit
             )
 
-            // Bottom overlay with file name and size
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -253,28 +434,144 @@ fun LocalFileItemRow(
                     .background(Color.Black.copy(alpha = 0.6f))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Column {
-                    Text(
-                        text = fileInfo.name,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = formatFileSize(fileInfo.size),
-                        color = Color(0xFFAAAAAA),
-                        fontSize = 10.sp
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = fileInfo.name,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = formatFileSize(fileInfo.size),
+                            color = Color(0xFFAAAAAA),
+                            fontSize = 10.sp,
+                            maxLines = 1
+                        )
+                    }
+
+                    if (fileInfo.type == FileType.VIDEO && fileInfo.durationMillis != null && fileInfo.durationMillis > 0) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = formatDuration(fileInfo.durationMillis),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.End
+                        )
+                    }
                 }
+            }
+
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = Color(0xFF6D28D9),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(20.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.2f))
+                )
             }
         }
     }
 }
 
-// Helper to format file size
+@Composable
+fun DeleteConfirmationDialog(
+    count: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Files") },
+        text = { Text("Are you sure you want to permanently delete $count selected file(s)? This action cannot be undone.") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete", color = Color(0xFFF44336))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        containerColor = Color(0xFF2A2A2A),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFAAAAAA)
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MoveTargetDialog(
+    folders: List<FolderItem>,
+    onDismiss: () -> Unit,
+    onConfirm: (FolderItem) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Move to Folder") },
+        text = {
+            if (folders.isEmpty()) {
+                Text("No other folders available.", color = Color(0xFFAAAAAA))
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(items = folders, key = { folder -> folder.path }) { folder ->
+                        ListItem(
+                            headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
+                            modifier = Modifier.clickable { onConfirm(folder) },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent,
+                                headlineColor = Color.White,
+                                leadingIconColor = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {}) { }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        containerColor = Color(0xFF2A2A2A),
+        titleContentColor = Color.White,
+        textContentColor = Color(0xFFAAAAAA)
+    )
+}
+
+fun formatDuration(millis: Long): String {
+    val hours = TimeUnit.MILLISECONDS.toHours(millis)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % TimeUnit.HOURS.toMinutes(1)
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % TimeUnit.MINUTES.toSeconds(1)
+
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
+    }
+}
+
 fun formatFileSize(sizeBytes: Long): String {
     if (sizeBytes <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
@@ -282,7 +579,6 @@ fun formatFileSize(sizeBytes: Long): String {
     return String.format("%.1f %s", sizeBytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
 }
 
-// Simple Error State Composable (can reuse/adapt from AlbumView if preferred)
 @Composable
 fun LocalErrorState(errorMessage: String, onRetry: () -> Unit) {
     Column(

@@ -68,6 +68,9 @@ dependencies {
     implementation(libs.androidx.adaptive)
     implementation(libs.android.coil)
     implementation(libs.android.okhttp3)
+    implementation(libs.androidx.media3.exoplayer) // Check for the latest version
+    implementation(libs.androidx.media3.ui)      // For the PlayerView UI component
+    implementation(libs.androidx.media3.common)
     implementation(libs.android.jsoup)
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
