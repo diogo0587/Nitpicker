@@ -2,7 +2,6 @@ package com.example.nitpicker.screen.files // Corrected package name
 
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,8 +21,6 @@ import androidx.compose.ui.unit.sp // Import for sp unit
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
-import com.example.nitpicker.R // Assuming you might use resources like HomeView does
-import androidx.compose.ui.res.painterResource // If using drawable resources
 import androidx.compose.runtime.mutableStateOf // Add import
 import androidx.compose.runtime.remember // Add import
 import androidx.compose.runtime.rememberCoroutineScope // Add import

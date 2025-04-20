@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
                 Log.d("NavigationFlow", "Recomposed - Route: $currentRoute, Drawer: ${drawerState.currentValue}")
 
                 // Determine if the drawer gesture should be enabled
-                val gesturesEnabled = true // Only enable on home screen
+                val gesturesEnabled = currentRoute != "player_screen/{videoPath}" // Disable drawer gesture on player screen
 
                 val configuration = LocalConfiguration.current
                 val screenWidthDp = configuration.screenWidthDp.dp
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
 
                 ModalNavigationDrawer(
                     drawerState = drawerState,
-                    gesturesEnabled = gesturesEnabled, // Control gesture based on route
+                    gesturesEnabled = gesturesEnabled, // Use the calculated value
                     drawerContent = {
                         ModalDrawerSheet(
                             modifier = Modifier
@@ -216,8 +216,11 @@ class MainActivity : ComponentActivity() {
                                 LocalAlbumScreen(navController = navController)
                             }
                             composable(
-                                route = "player_screen/{videoPath}",
-                                arguments = listOf(navArgument("videoPath") { type = NavType.StringType })
+                                route = "player_screen/{folderPath}/{initialIndex}",
+                                arguments = listOf(
+                                    navArgument("folderPath") { type = NavType.StringType },
+                                    navArgument("initialIndex") { type = NavType.IntType }
+                                )
                             ) { backStackEntry ->
                                 PlayerScreen(navController = navController)
                             }

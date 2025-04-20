@@ -41,7 +41,7 @@ class AlbumViewModel @Inject constructor( // Use @Inject constructor
     private val _uiState = MutableStateFlow(AlbumUiState())
     val uiState: StateFlow<AlbumUiState> = _uiState.asStateFlow()
 
-    // Channel 用于发送一次性事件，如 Snackbar 消息
+    // Channel 用于发送一次性事件，如 Snack bar 消息
     private val _snackbarMessages = Channel<String>()
     val snackbarMessages = _snackbarMessages.receiveAsFlow()
 

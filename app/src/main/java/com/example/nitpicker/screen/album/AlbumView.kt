@@ -33,16 +33,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import com.example.nitpicker.R
 import com.example.nitpicker.model.FileInfo
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import androidx.compose.material3.adaptive.currentWindowSize
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.mutableStateOf

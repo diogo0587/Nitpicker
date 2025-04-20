@@ -216,6 +216,10 @@ fun LocalAlbumScreen(
                         }
                     }
                     else -> {
+                        val videoFiles = uiState.files
+                            .filter { it.type == FileType.VIDEO }
+                            .sortedBy { it.name }
+
                         LocalFilesGrid(
                             files = uiState.files,
                             gridState = gridState,
@@ -228,18 +232,26 @@ fun LocalAlbumScreen(
                                 } else {
                                     when (file.type) {
                                         FileType.VIDEO -> {
-                                            Log.d("LocalAlbumScreen", "Navigating to player for: ${file.path}")
-                                            val encodedPath = try {
-                                                URLEncoder.encode(file.path, StandardCharsets.UTF_8.toString())
-                                            } catch (e: Exception) {
-                                                Log.e("Navigation", "Failed to encode video path: ${file.path}", e)
-                                                ""
-                                            }
-                                            if (encodedPath.isNotEmpty()) {
-                                                navController.navigate("player_screen/$encodedPath")
+                                            val initialIndex = videoFiles.indexOfFirst { it.path == file.path }
+                                            if (initialIndex != -1) {
+                                                Log.d("LocalAlbumScreen", "Navigating to player for folder: ${uiState.folderPath}, index: $initialIndex (sorted list)")
+                                                val encodedFolderPath = try {
+                                                    URLEncoder.encode(uiState.folderPath, StandardCharsets.UTF_8.toString())
+                                                } catch (e: Exception) {
+                                                    Log.e("Navigation", "Failed to encode folder path: ${uiState.folderPath}", e)
+                                                    ""
+                                                }
+                                                if (encodedFolderPath.isNotEmpty()) {
+                                                    navController.navigate("player_screen/$encodedFolderPath/$initialIndex")
+                                                } else {
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar("Could not open video player.")
+                                                    }
+                                                }
                                             } else {
+                                                Log.e("LocalAlbumScreen", "Clicked video not found in filtered list: ${file.path}")
                                                 scope.launch {
-                                                    snackbarHostState.showSnackbar("Could not open video.")
+                                                    snackbarHostState.showSnackbar("Error finding video index.")
                                                 }
                                             }
                                         }

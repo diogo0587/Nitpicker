@@ -1,25 +1,36 @@
 package com.example.nitpicker.screen.player
 
+import android.app.Activity
 import android.util.Log
+import android.view.View
+import com.example.nitpicker.screen.player.PlayerViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.NavigateBefore
+import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView // 导入 Media3 PlayerView
+import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,106 +42,190 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val view = LocalView.current
 
-    // --- ExoPlayer 状态管理 ---
-    // 使用 remember 来创建和记住 ExoPlayer 实例
+    var isControllerVisible by remember { mutableStateOf(false) }
+
+    val window = (view.context as? Activity)?.window
+    val windowInsetsController = remember(view, window) {
+        window?.let { WindowCompat.getInsetsController(it, view) }
+    }
+
     val exoPlayer = remember { ExoPlayer.Builder(context).build() }
 
-    // --- 播放器生命周期处理 ---
-    DisposableEffect(exoPlayer, lifecycleOwner, uiState.videoUri) {
+    LaunchedEffect(isControllerVisible, windowInsetsController) {
+        if (windowInsetsController == null) return@LaunchedEffect
+        if (isControllerVisible) {
+            Log.d("SystemUI", "Controller visible, showing system bars.")
+            windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+            Log.d("SystemUI", "Controller hidden, hiding system bars.")
+            windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+            windowInsetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    DisposableEffect(exoPlayer, lifecycleOwner, viewModel) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                Log.d("ExoPlayerState", "Playback state changed: $playbackState")
+                viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
+                    viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, playWhenReady)
+                }
+                viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
+            }
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                    viewModel.saveCurrentPlaybackState(newPosition.positionMs, exoPlayer.playWhenReady)
+                }
+                viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                Log.d("ExoPlayerState", "MediaItem transition, new item: ${mediaItem?.mediaMetadata?.title}, reason: $reason")
+                viewModel.onMediaItemTransition(mediaItem)
+                viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
+            }
+
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
+            }
+        }
+        exoPlayer.addListener(listener)
+
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> {
-                    Log.d("PlayerLifecycle", "ON_START: Initializing player.")
-                    // 当 videoUri 准备好时，在 ON_START 中开始播放
-                    if (exoPlayer.playbackState == ExoPlayer.STATE_READY || exoPlayer.playbackState == ExoPlayer.STATE_BUFFERING) {
-                        exoPlayer.playWhenReady = true
+                Lifecycle.Event.ON_STOP -> {
+                    Log.d("PlayerLifecycle", "ON_STOP: Saving state and pausing.")
+                    if (exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
+                        viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, exoPlayer.playWhenReady)
+                    }
+                    if (exoPlayer.isPlaying) {
+                        exoPlayer.pause()
                     }
                 }
-                Lifecycle.Event.ON_STOP -> {
-                    Log.d("PlayerLifecycle", "ON_STOP: Pausing player.")
-                    exoPlayer.pause() // 当屏幕不可见时暂停
+                Lifecycle.Event.ON_START -> {
+                    Log.d("PlayerLifecycle", "ON_START: Player will resume if playWhenReady is true.")
                 }
-                // ON_DESTROY 由 onDispose 处理
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
-        // 当 Uri 可用时设置媒体项
-        uiState.videoUri?.let { uri ->
-            Log.d("PlayerSetup", "Setting media item: $uri")
-            val mediaItem = MediaItem.fromUri(uri)
-            exoPlayer.setMediaItem(mediaItem)
-            exoPlayer.prepare() // 准备播放器
-            // 如果生命周期已经是 START 或 RESUME，则立即开始播放
-            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                 exoPlayer.playWhenReady = true
-            }
-        }
-
         onDispose {
-            Log.d("PlayerLifecycle", "ON_DISPOSE: Releasing player.")
+            Log.d("PlayerLifecycle", "ON_DISPOSE: Saving final state and releasing player.")
             lifecycleOwner.lifecycle.removeObserver(observer)
-            exoPlayer.release() // 释放播放器资源
+            exoPlayer.removeListener(listener)
+            if (exoPlayer.playbackState != Player.STATE_IDLE) {
+                try {
+                    viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, exoPlayer.playWhenReady)
+                } catch (e: Exception) {
+                    Log.e("PlayerLifecycle", "Error saving state on dispose", e)
+                }
+            }
+            exoPlayer.release()
+            Log.d("PlayerLifecycle", "Player released.")
+        }
+    }
+
+    LaunchedEffect(uiState.mediaItems, uiState.initialWindowIndex, exoPlayer) {
+        if (uiState.mediaItems.isNotEmpty()) {
+            Log.d("PlayerSetup", "Setting media items. Count: ${uiState.mediaItems.size}, Start Index: ${uiState.initialWindowIndex}, Start Pos: ${uiState.playbackPosition}")
+            exoPlayer.setMediaItems(uiState.mediaItems, uiState.initialWindowIndex, uiState.playbackPosition)
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = uiState.playWhenReady
+            Log.d("PlayerSetup", "Player prepared. playWhenReady set to: ${uiState.playWhenReady}")
+        } else if (!uiState.isLoading) {
+            Log.d("PlayerSetup", "MediaItems list is empty, clearing player.")
+            exoPlayer.clearMediaItems()
         }
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Video Player") }, // 或显示视频名称
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Black, // 匹配播放器背景
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
+            if (isControllerVisible) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            uiState.videoTitle ?: "Loading...",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Black.copy(alpha = 0.5f),
+                        titleContentColor = Color.White,
+                        navigationIconContentColor = Color.White
+                    )
                 )
-            )
+            }
         },
-        containerColor = Color.Black // 将背景设置为黑色
+        containerColor = Color.Black
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.Black), // 确保背景是黑色
+                .background(Color.Black)
+                .padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            if (uiState.videoUri != null) {
-                // 使用 AndroidView 嵌入 Media3 PlayerView
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            player = exoPlayer
-                            useController = true // 显示默认播放控件
-                            // 可选：自定义控制器行为
-                            // controllerShowTimeoutMs = 3000
-                            // controllerHideOnTouch = true
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize() // 填充可用空间
-                )
-            } else {
-                // Check for error using let
-                uiState.error?.let { errorMessage -> // errorMessage is guaranteed non-null here
-                    // 显示错误信息
+            val currentUiState = uiState
+            val currentError = currentUiState.error
+
+            when {
+                currentUiState.isLoading -> {
+                    CircularProgressIndicator(color = Color.White)
+                }
+                currentError != null -> {
                     Text(
-                        text = errorMessage,
+                        text = currentError,
                         color = Color.Red,
                         modifier = Modifier.padding(16.dp)
                     )
-                } ?: run { // If error is null, show the loading indicator
-                    // 加载状态或初始状态 (when videoUri is also null)
-                    if (uiState.videoUri == null) { // Add check to only show loading if URI isn't ready
-                         CircularProgressIndicator(color = Color.White)
-                    }
-                    // If videoUri is not null but error is null, the AndroidView will be shown.
-                    // This else block might need adjustment based on exact loading logic.
+                }
+                currentUiState.mediaItems.isNotEmpty() -> {
+                    AndroidView(
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                player = exoPlayer
+                                useController = true
+                                setControllerVisibilityListener(
+                                    PlayerView.ControllerVisibilityListener { visibility ->
+                                        Log.d("PlayerView", "Controller visibility changed: $visibility")
+                                        isControllerVisible = visibility == View.VISIBLE
+                                    }
+                                )
+                            }
+                        },
+                        update = { playerView ->
+                            playerView.player = exoPlayer
+                            playerView.setControllerVisibilityListener(
+                                PlayerView.ControllerVisibilityListener { visibility ->
+                                    Log.d("PlayerView", "Controller visibility changed (update): $visibility")
+                                    isControllerVisible = visibility == View.VISIBLE
+                                }
+                            )
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                else -> {
+                    Text("No video found or playlist empty.", color = Color.Gray)
                 }
             }
         }

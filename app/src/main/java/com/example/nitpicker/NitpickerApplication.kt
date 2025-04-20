@@ -6,5 +6,5 @@ import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
 class NitpickerApplication : Application() {
-    // 你可以在这里添加自定义的 Application 逻辑
+
 }
