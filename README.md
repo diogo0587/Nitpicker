@@ -1,2 +1,2 @@
 # Nitpicker
-The third-party client Android software of the website bunkr,optimizes the user experience
+a third-party client Android software of bunkr-albums,optimizes the user experience
