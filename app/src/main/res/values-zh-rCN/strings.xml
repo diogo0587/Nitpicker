@@ -95,4 +95,11 @@
     <string name="local_album_move_dialog_empty">没有其他可用的文件夹。</string>
     <string name="local_album_error_title">加载文件夹时出错</string>
 
+    <!-- Image Viewer Screen -->
+    <string name="image_viewer_loading">加载图片中...</string>
+    <string name="image_viewer_cd">图片: %1$s</string>
+    <string name="image_viewer_load_error">加载图片出错</string>
+    <string name="image_viewer_invalid_image">无效的图片</string>
+    <string name="image_viewer_no_images">没有找到图片</string>
+
 </resources>

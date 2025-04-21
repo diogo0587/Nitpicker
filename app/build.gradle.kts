@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.androidx.material3.windowsizeclass)
     implementation(libs.androidx.adaptive)
     implementation(libs.android.coil)
+    implementation(libs.zoomable)
     implementation(libs.android.okhttp3)
     implementation(libs.androidx.media3.exoplayer) // Check for the latest version
     implementation(libs.androidx.media3.ui)      // For the PlayerView UI component

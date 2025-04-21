@@ -93,20 +93,59 @@ class LocalAlbumViewModel @Inject constructor(
     }
 
     fun loadFiles() {
+        loadFilesForPath(folderPath)
+    }
+
+    private fun loadFilesForPath(folderPath: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val folder = File(folderPath)
                 if (!folder.exists() || !folder.isDirectory) {
-                    throw IOException("Folder not found or is not a directory.")
+                    throw IOException("Folder not found or is not a directory: $folderPath")
                 }
-                val fileList = withContext(Dispatchers.IO) {
-                    folder.listFiles()?.mapNotNull { processFile(it) } ?: emptyList()
+
+                val files = folder.listFiles()
+                if (files == null) {
+                    // Handle case where listFiles returns null (e.g., permission issue)
+                    _uiState.update { it.copy(files = emptyList(), isLoading = false, error = "Could not list files in folder.") }
+                    Log.e("LocalAlbumViewModel", "listFiles() returned null for path: $folderPath")
+                    return@launch
                 }
-                _uiState.update { it.copy(files = fileList.sortedByDescending { it.lastModified }, isLoading = false) }
+
+                val fileItems = mutableListOf<LocalFileItem>()
+                withContext(Dispatchers.IO) { // Keep file processing off the main thread
+                    files.forEach { file ->
+                        processFile(file)?.let { fileItems.add(it) }
+                    }
+                }
+
+                // --- SORT THE LIST HERE (Videos first, then Images, then by name) ---
+                val sortedFileItems = fileItems.sortedWith(
+                    compareBy<LocalFileItem> {
+                        // Assign lower number to VIDEO to make it appear first
+                        when (it.type) {
+                            FileType.VIDEO -> 0
+                            FileType.IMAGE -> 1
+                        }
+                    }.thenBy { it.name } // Then sort by name within each type group
+                )
+                // --- END SORTING ---
+
+                _uiState.update {
+                    it.copy(
+                        files = sortedFileItems, // <-- Use the new multi-level sorted list
+                        isLoading = false,
+                        folderPath = folderPath,
+                        folderName = folder.name,
+                        error = null // Clear previous error on success
+                    )
+                }
+                Log.d("LocalAlbumViewModel", "Loaded and sorted ${sortedFileItems.size} files (videos first) for path: $folderPath")
+
             } catch (e: Exception) {
-                Log.e("LocalAlbumViewModel", "Error loading files from $folderPath", e)
-                _uiState.update { it.copy(error = "Error loading files: ${e.message}", isLoading = false) }
+                Log.e("LocalAlbumViewModel", "Error loading files for path: $folderPath", e)
+                _uiState.update { it.copy(isLoading = false, error = e.message ?: "Failed to load files.") }
             }
         }
     }

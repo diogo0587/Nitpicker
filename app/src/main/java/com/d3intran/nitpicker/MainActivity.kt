@@ -39,6 +39,7 @@ import com.d3intran.nitpicker.ui.screens.HomeScreen
 import com.d3intran.nitpicker.screen.files.FilesScreen
 import com.d3intran.nitpicker.screen.local_album.LocalAlbumScreen
 import com.d3intran.nitpicker.screen.player.PlayerScreen
+import com.d3intran.nitpicker.screen.image.ImageViewerScreen
 import com.d3intran.nitpicker.ui.theme.NitpickerTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -213,14 +214,22 @@ class MainActivity : ComponentActivity() {
                                 LocalAlbumScreen(navController = navController)
                             }
                             composable(
-                                route = "player_screen/{folderPath}/{initialIndex}", // Keep this route definition
+                                route = "player_screen/{folderPath}/{initialIndex}",
                                 arguments = listOf(
                                     navArgument("folderPath") { type = NavType.StringType },
                                     navArgument("initialIndex") { type = NavType.IntType }
                                 )
                             ) { backStackEntry ->
-                                // PlayerScreen now correctly handles state restoration via ViewModel
                                 PlayerScreen(navController = navController)
+                            }
+                            composable(
+                                route = "image_viewer_screen/{folderPath}/{initialIndex}",
+                                arguments = listOf(
+                                    navArgument("folderPath") { type = NavType.StringType },
+                                    navArgument("initialIndex") { type = NavType.IntType }
+                                )
+                            ) { backStackEntry ->
+                                ImageViewerScreen(navController = navController)
                             }
                         }
                     }

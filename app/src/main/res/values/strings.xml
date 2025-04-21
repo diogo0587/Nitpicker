@@ -22,7 +22,7 @@
     <!-- Common Labels & Statuses -->
     <string name="selected_count">%1$d selected</string>
     <string name="selected_content_description">Selected</string>
-    <string name="error_unknown">Unknown error</string>
+    <string name="error_unknown">An unknown error occurred.</string>
     <string name="loading">Loading…</string>
     <string name="folder">Folder</string> <!-- Content description -->
 
@@ -93,5 +93,12 @@
     <string name="local_album_move_dialog_title">Move to Folder</string>
     <string name="local_album_move_dialog_empty">No other folders available.</string>
     <string name="local_album_error_title">Error Loading Folder</string>
+
+    <!-- Image Viewer Screen -->
+    <string name="image_viewer_loading">Loading Image…</string>
+    <string name="image_viewer_cd">Image: %1$s</string>
+    <string name="image_viewer_load_error">Error loading image</string>
+    <string name="image_viewer_invalid_image">Invalid image</string>
+    <string name="image_viewer_no_images">No images found</string>
 
 </resources>

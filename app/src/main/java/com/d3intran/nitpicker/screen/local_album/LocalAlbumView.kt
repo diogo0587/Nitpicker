@@ -219,12 +219,16 @@ fun LocalAlbumScreen(
                         }
                     }
                     else -> {
+                        // Filter and sort images and videos separately for correct indexing
+                        val imageFiles = uiState.files
+                            .filter { it.type == FileType.IMAGE }
+                            .sortedBy { it.name } // Ensure same sorting as ViewModel
                         val videoFiles = uiState.files
                             .filter { it.type == FileType.VIDEO }
-                            .sortedBy { it.name }
+                            .sortedBy { it.name } // Ensure same sorting as ViewModel
 
                         LocalFilesGrid(
-                            files = uiState.files,
+                            files = uiState.files, // Pass the original mixed list for display order
                             gridState = gridState,
                             columnCount = columnCount,
                             isSelectionModeActive = uiState.isSelectionModeActive,
@@ -233,35 +237,39 @@ fun LocalAlbumScreen(
                                 if (uiState.isSelectionModeActive) {
                                     viewModel.toggleSelection(file.path)
                                 } else {
+                                    val encodedFolderPath = try {
+                                        URLEncoder.encode(uiState.folderPath, StandardCharsets.UTF_8.toString())
+                                    } catch (e: Exception) {
+                                        Log.e("Navigation", "Failed to encode folder path: ${uiState.folderPath}", e)
+                                        "" // Handle encoding error
+                                    }
+
+                                    if (encodedFolderPath.isEmpty()) {
+                                         scope.launch { snackbarHostState.showSnackbar("Error preparing navigation.") }
+                                         return@LocalFilesGrid // Stop if encoding failed
+                                    }
+
                                     when (file.type) {
                                         FileType.VIDEO -> {
+                                            // Find index in the *sorted video list*
                                             val initialIndex = videoFiles.indexOfFirst { it.path == file.path }
                                             if (initialIndex != -1) {
-                                                Log.d("LocalAlbumScreen", "Navigating to player for folder: ${uiState.folderPath}, index: $initialIndex (sorted list)")
-                                                val encodedFolderPath = try {
-                                                    URLEncoder.encode(uiState.folderPath, StandardCharsets.UTF_8.toString())
-                                                } catch (e: Exception) {
-                                                    Log.e("Navigation", "Failed to encode folder path: ${uiState.folderPath}", e)
-                                                    ""
-                                                }
-                                                if (encodedFolderPath.isNotEmpty()) {
-                                                    navController.navigate("player_screen/$encodedFolderPath/$initialIndex")
-                                                } else {
-                                                    scope.launch {
-                                                        snackbarHostState.showSnackbar(snackbarPlayerError)
-                                                    }
-                                                }
+                                                Log.d("LocalAlbumScreen", "Navigating to player for folder: ${uiState.folderPath}, index: $initialIndex (sorted video list)")
+                                                navController.navigate("player_screen/$encodedFolderPath/$initialIndex")
                                             } else {
-                                                Log.e("LocalAlbumScreen", "Clicked video not found in filtered list: ${file.path}")
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar(snackbarIndexError)
-                                                }
+                                                Log.e("LocalAlbumScreen", "Clicked video not found in filtered/sorted list: ${file.path}")
+                                                scope.launch { snackbarHostState.showSnackbar(snackbarIndexError) }
                                             }
                                         }
                                         FileType.IMAGE -> {
-                                            Log.d("LocalAlbumScreen", "Clicked on image (view mode): ${file.name}")
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar(snackbarImageViewerNYI)
+                                            // Find index in the *sorted image list*
+                                            val initialIndex = imageFiles.indexOfFirst { it.path == file.path }
+                                            if (initialIndex != -1) {
+                                                Log.d("LocalAlbumScreen", "Navigating to image viewer for folder: ${uiState.folderPath}, index: $initialIndex (sorted image list)")
+                                                navController.navigate("image_viewer_screen/$encodedFolderPath/$initialIndex")
+                                            } else {
+                                                 Log.e("LocalAlbumScreen", "Clicked image not found in filtered/sorted list: ${file.path}")
+                                                 scope.launch { snackbarHostState.showSnackbar(snackbarIndexError) }
                                             }
                                         }
                                     }
