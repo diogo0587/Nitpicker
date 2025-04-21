@@ -24,7 +24,7 @@
 
 你可以直接从 **[GitHub Releases](URL_TO_YOUR_RELEASES_PAGE)** 页面下载最新的 `app-release.apk` 文件进行安装。
 
-1.  前往 [Releases 页面](URL_TO_YOUR_RELEASES_PAGE)。
+1.  前往 **[Releases page](https://github.com/d3intran/Nitpicker/releases)**。
 2.  下载最新版本下的 `Nitpicker.apk` 文件。
 3.  在你的 Android 设备上，你可能需要允许“安装来自未知来源的应用”才能安装该 APK。
 4.  找到下载的 APK 文件并点击安装。

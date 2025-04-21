@@ -20,10 +20,10 @@
 
 ## 🚀 Installation
 
-You can download the latest `app-release.apk` file directly from the **[GitHub Releases](URL_TO_YOUR_RELEASES_PAGE)** page.
+You can download the latest `app-release.apk` file directly from the **[GitHub Releases](https://github.com/d3intran/Nitpicker/releases)** page.
 
-1.  Go to the [Releases page](URL_TO_YOUR_RELEASES_PAGE). <!-- TODO: Replace with your actual Releases page URL -->
-2.  Download the `app-release.apk` file from the latest release. <!-- Corrected filename based on standard build output -->
+1.  Go to the **[Releases page](https://github.com/d3intran/Nitpicker/releases)**. 
+2.  Download the `Nitpicker.apk` file from the latest release. 
 3.  On your Android device, you might need to enable "Install from unknown sources" to install the APK.
 4.  Locate the downloaded APK file and tap to install.
 
