@@ -88,38 +88,35 @@ class AlbumViewModel @Inject constructor( // Use @Inject constructor
         fetchFileInfo()
     }
 
-    // 切换文件选中状态
+    // 切换文件选中状态 (确保 allFiles 也更新)
     fun toggleFileSelection(file: FileInfo) {
         _uiState.update { currentState ->
-            // 如果文件已加入队列，则不允许选中/取消选中
             if (currentState.queuedFiles.contains(file.pageUrl)) {
-                return@update currentState
+                return@update currentState // Don't allow selection change if queued
             }
 
             val currentSelected = currentState.selectedFiles.toMutableMap()
             val isCurrentlySelected = currentSelected.containsKey(file.pageUrl)
 
-            // 更新 selectedFiles Map
             if (isCurrentlySelected) {
                 currentSelected.remove(file.pageUrl)
             } else {
-                currentSelected[file.pageUrl] = file // Store the actual FileInfo object
+                currentSelected[file.pageUrl] = file
             }
 
-            // 更新 allFiles 列表中的 isSelected 状态
+            // --- 重要: 更新 allFiles 列表中的 isSelected 状态 ---
             val updatedAllFiles = currentState.allFiles.map { existingFile ->
                 if (existingFile.pageUrl == file.pageUrl) {
-                    // 创建一个新的 FileInfo 实例，切换 isSelected 状态
-                    existingFile.copy(isSelected = !isCurrentlySelected)
+                    existingFile.copy(isSelected = !isCurrentlySelected) // Toggle state
                 } else {
-                    existingFile // 其他文件保持不变
+                    existingFile // Keep others as they are
                 }
             }
+            // --- 结束更新 allFiles ---
 
-            // 更新 UI State
             currentState.copy(
                 selectedFiles = currentSelected,
-                allFiles = updatedAllFiles // 使用更新后的 allFiles 列表
+                allFiles = updatedAllFiles // 使用更新后的 allFiles
             )
         }
     }
@@ -133,28 +130,48 @@ class AlbumViewModel @Inject constructor( // Use @Inject constructor
             val currentState = _uiState.value
             // Apply the current filter to get the list of visible files
             val visibleFiles = filterFiles(currentState.allFiles, currentState.currentFilter)
+            // Filter out already queued files, as they cannot be selected
+            val selectableVisibleFiles = visibleFiles.filter { !currentState.queuedFiles.contains(it.pageUrl) }
 
             val currentSelected = currentState.selectedFiles.toMutableMap()
+            val updatedAllFiles = currentState.allFiles.toMutableList() // Create mutable list for efficient update
 
             if (selectAll) {
-                // Add all visible files to selection (excluding already queued ones)
-                visibleFiles.forEach { file ->
-                    if (!currentState.queuedFiles.contains(file.pageUrl)) {
-                        currentSelected[file.pageUrl] = file // Add FileInfo object
+                // Add all selectable visible files to selection
+                selectableVisibleFiles.forEach { file ->
+                    if (!currentSelected.containsKey(file.pageUrl)) { // Avoid re-adding
+                        currentSelected[file.pageUrl] = file.copy(isSelected = true) // Ensure isSelected is true
+                        // Update in allFiles list
+                        val index = updatedAllFiles.indexOfFirst { it.pageUrl == file.pageUrl }
+                        if (index != -1) {
+                            updatedAllFiles[index] = updatedAllFiles[index].copy(isSelected = true)
+                        }
                     }
                 }
             } else {
-                // Deselect all files (or just the visible ones - deselecting all is simpler)
+                // Deselect all files (or just the visible ones - deselecting all is simpler and often desired)
                 currentSelected.clear()
+                // Update allFiles list to reflect deselection
+                updatedAllFiles.indices.forEach { index ->
+                    if (updatedAllFiles[index].isSelected) { // Only update if it was selected
+                         updatedAllFiles[index] = updatedAllFiles[index].copy(isSelected = false)
+                    }
+                }
                 // Alternative: Deselect only visible ones:
                 // val visibleFileUrls = visibleFiles.map { it.pageUrl }.toSet()
-                // visibleFileUrls.forEach { currentSelected.remove(it) }
+                // visibleFileUrls.forEach { url ->
+                //     currentSelected.remove(url)
+                //     val index = updatedAllFiles.indexOfFirst { it.pageUrl == url }
+                //     if (index != -1 && updatedAllFiles[index].isSelected) {
+                //         updatedAllFiles[index] = updatedAllFiles[index].copy(isSelected = false)
+                //     }
+                // }
             }
 
             _uiState.update {
                 it.copy(
-                    selectedFiles = currentSelected
-                    // No need to update allFiles manually
+                    selectedFiles = currentSelected,
+                    allFiles = updatedAllFiles // Use the updated list
                 )
             }
         }

@@ -99,6 +99,9 @@ fun AlbumScreen(
         2
     }
 
+    // Calculate filtered files once
+    val filteredFiles = filterFiles(uiState.allFiles, uiState.currentFilter)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -143,42 +146,63 @@ fun AlbumScreen(
                     val selectedCount = uiState.selectedFileCount
                     val isAnythingSelected = selectedCount > 0
 
-                    // Define colors based on selection state
-                    val iconButtonContainerColor = if (isAnythingSelected) {
-                        Color(0xFF6D28D9) // Purple background when selected
-                    } else {
-                        Color.Transparent // No background when not selected
-                    }
-                    val iconButtonContentColor = Color.White // Icon color remains white
+                    // --- Calculate Checkbox State ---
+                    val selectableVisibleFiles = filteredFiles.filter { !uiState.queuedFiles.contains(it.pageUrl) }
+                    val isAllSelectedChecked = selectableVisibleFiles.isNotEmpty() && selectableVisibleFiles.all { it.isSelected }
+                    val isCheckboxEnabled = selectableVisibleFiles.isNotEmpty()
+                    // --- End Checkbox State Calculation ---
 
-                    // IconButton without BadgedBox
+                    // --- Add Checkbox ---
+                    Checkbox(
+                        checked = isAllSelectedChecked,
+                        onCheckedChange = { shouldSelectAll ->
+                            albumViewModel.toggleSelectAllVisible(shouldSelectAll)
+                        },
+                        enabled = isCheckboxEnabled,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = Color(0xFF6D28D9),
+                            uncheckedColor = Color.White,
+                            checkmarkColor = Color.White,
+                            disabledCheckedColor = Color.Gray.copy(alpha = 0.5f),
+                            disabledUncheckedColor = Color.Gray.copy(alpha = 0.5f)
+                        )
+                    )
+                    // --- End Checkbox Addition ---
+
+                    // --- Download Button ---
+                    val iconButtonContainerColor = if (isAnythingSelected) {
+                        Color(0xFF6D28D9)
+                    } else {
+                        Color.Transparent
+                    }
+                    val iconButtonContentColor = Color.White
+
                     IconButton(
                         onClick = {
                             if (isAnythingSelected) {
                                 albumViewModel.queueSelectedFilesForDownload()
                             } else {
-                                // Navigate to download screen when nothing is selected
                                 navController.navigate("download_screen")
                             }
                         },
-                        // Apply conditional colors
                         colors = IconButtonDefaults.iconButtonColors(
                             containerColor = iconButtonContainerColor,
                             contentColor = iconButtonContentColor
                         ),
-                        modifier = Modifier.clip(CircleShape) // Optional: Ensure background respects shape if needed
+                        modifier = Modifier.clip(CircleShape)
                     ) {
                         Icon(
                             Icons.Filled.Download,
                             contentDescription = if (isAnythingSelected) stringResource(R.string.album_download_selected) else stringResource(R.string.album_open_download_manager)
                         )
                     }
+                    // --- End Download Button ---
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFF1E1E1E),
                     titleContentColor = Color.White,
                     navigationIconContentColor = Color.White,
-                    actionIconContentColor = Color.White // Default action icon color
+                    actionIconContentColor = Color.White
                 )
             )
         },
@@ -213,8 +237,6 @@ fun AlbumScreen(
                         )
                     }
                     else -> {
-                        val filteredFiles = filterFiles(uiState.allFiles, uiState.currentFilter)
-
                         if (filteredFiles.isEmpty() && uiState.allFiles.isNotEmpty()) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -265,7 +287,6 @@ fun FilterControls(
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
-        // 第一个 FilterChip (ALL)
         val isAllSelected = currentFilter == FilterType.ALL
         FilterChip(
             selected = isAllSelected,
@@ -278,16 +299,14 @@ fun FilterControls(
                 containerColor = Color(0xFF2C2C2C),
                 labelColor = Color(0xFFAAAAAA)
             ),
-            border = FilterChipDefaults.filterChipBorder( // 修改这里
-                enabled = true, // 传递 enabled 状态
-                selected = isAllSelected, // 传递 selected 状态
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = isAllSelected,
                 borderColor = Color.Transparent,
                 selectedBorderColor = Color.Transparent
-                // 其他参数使用默认值或根据需要设置
             )
         )
 
-        // 第二个 FilterChip (IMAGES)
         val isImagesSelected = currentFilter == FilterType.IMAGES
         FilterChip(
             selected = isImagesSelected,
@@ -300,15 +319,14 @@ fun FilterControls(
                 containerColor = Color(0xFF2C2C2C),
                 labelColor = Color(0xFFAAAAAA)
             ),
-            border = FilterChipDefaults.filterChipBorder( // 修改这里
-                enabled = true, // 传递 enabled 状态
-                selected = isImagesSelected, // 传递 selected 状态
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = isImagesSelected,
                 borderColor = Color.Transparent,
                 selectedBorderColor = Color.Transparent
             )
         )
 
-        // 第三个 FilterChip (OTHER)
         val isOtherSelected = currentFilter == FilterType.OTHER
         FilterChip(
             selected = isOtherSelected,
@@ -321,9 +339,9 @@ fun FilterControls(
                 containerColor = Color(0xFF2C2C2C),
                 labelColor = Color(0xFFAAAAAA)
             ),
-            border = FilterChipDefaults.filterChipBorder( // 修改这里
-                enabled = true, // 传递 enabled 状态
-                selected = isOtherSelected, // 传递 selected 状态
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = isOtherSelected,
                 borderColor = Color.Transparent,
                 selectedBorderColor = Color.Transparent
             )
