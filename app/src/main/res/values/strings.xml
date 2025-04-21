@@ -1,6 +1,9 @@
 <!-- filepath: e:\Android\nitpicker\app\src\main\res\values\strings.xml -->
 <resources>
     <string name="app_name">Nitpicker</string>
+    <string name="drawer_home">Home</string>
+    <string name="drawer_downloads">Downloads</string>
+    <string name="drawer_files">Files</string>
 
     <!-- Common Actions -->
     <string name="action_back">Back</string>

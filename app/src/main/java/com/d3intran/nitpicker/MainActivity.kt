@@ -20,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -46,7 +48,12 @@ import kotlinx.coroutines.CoroutineScope
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Handle the splash screen transition.
+        // Must be called before super.onCreate()
+        installSplashScreen()
+
         super.onCreate(savedInstanceState)
+
         setContent {
             NitpickerTheme {
                 val navController = rememberNavController()
@@ -97,7 +104,7 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Spacer(Modifier.height(12.dp))
                             DrawerItem(
-                                label = "Home",
+                                label = stringResource(id = R.string.drawer_home),
                                 icon = Icons.Filled.Home,
                                 route = "home_screen",
                                 currentRoute = currentRoute,
@@ -117,7 +124,7 @@ class MainActivity : ComponentActivity() {
                                 updateLastNavTime = { newTime -> lastNavTime = newTime }
                             )
                             DrawerItem(
-                                label = "Downloads",
+                                label = stringResource(id = R.string.drawer_downloads),
                                 icon = Icons.Filled.Download,
                                 route = "download_screen",
                                 currentRoute = currentRoute,
@@ -137,7 +144,7 @@ class MainActivity : ComponentActivity() {
                                 updateLastNavTime = { newTime -> lastNavTime = newTime }
                             )
                             DrawerItem(
-                                label = "Files",
+                                label = stringResource(id = R.string.drawer_files),
                                 icon = Icons.Filled.Folder,
                                 route = "files_screen",
                                 currentRoute = currentRoute,

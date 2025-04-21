@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,7 +36,6 @@ fun HomeScreen(
     navController: NavController,
     openDrawer: () -> Unit
 ) {
-    // Log composition start and end
     DisposableEffect(Unit) {
         Log.d("CompositionLifecycle", "HomeScreen Composed")
         onDispose {
@@ -44,12 +44,17 @@ fun HomeScreen(
     }
 
     val uiState by homeViewModel.uiState.collectAsState()
-    Log.d("HomeScreenState", "Recomposing HomeScreen. isLoading: ${uiState.isLoading}, error: ${uiState.error}, albums: ${uiState.albums.size}") // Log state on recomposition
+    Log.d("HomeScreenState", "Recomposing HomeScreen. isLoading: ${uiState.isLoading}, error: ${uiState.error}, albums: ${uiState.albums.size}")
     val searchText by homeViewModel.searchText.collectAsState()
+
+    val unknownError = stringResource(R.string.error_unknown)
+    val errorTitle = stringResource(R.string.home_error_title)
+    val noResultsText = stringResource(R.string.home_no_results)
+    val initialPromptText = stringResource(R.string.home_initial_prompt)
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF121212) // 暗色背景
+        color = Color(0xFF121212)
     ) {
         Column(
             modifier = Modifier
@@ -57,30 +62,27 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Box to hold Menu Icon and Title
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp, bottom = 8.dp)
             ) {
-                // Menu Icon Button - Top Left
                 IconButton(
                     onClick = {
                         Log.d("DrawerAction", "[${System.currentTimeMillis()}] HomeScreen: IconButton onClick triggered.")
-                        openDrawer() // Call the lambda passed from MainActivity
+                        openDrawer()
                     },
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Menu,
-                        contentDescription = "Open Drawer",
+                        contentDescription = stringResource(R.string.home_open_drawer),
                         tint = Color.White
                     )
                 }
 
-                // 标题 - Centered
                 Text(
-                    text = "Nitpicker",
+                    text = stringResource(R.string.home_title),
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -88,7 +90,6 @@ fun HomeScreen(
                 )
             }
 
-            // 搜索框与按钮
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -98,8 +99,8 @@ fun HomeScreen(
                 TextField(
                     value = searchText,
                     onValueChange = { homeViewModel.updateSearchText(it) },
-                    placeholder = { Text("Search album...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                    placeholder = { Text(stringResource(R.string.home_search_placeholder)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.home_search_cd)) },
                     modifier = Modifier
                         .fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
@@ -117,7 +118,6 @@ fun HomeScreen(
                     singleLine = true
                 )
 
-                // "find" 按钮
                 Button(
                     onClick = { homeViewModel.searchAlbums() },
                     modifier = Modifier
@@ -131,31 +131,28 @@ fun HomeScreen(
                     )
                 ) {
                     Text(
-                        text = "find",
+                        text = stringResource(R.string.action_find),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
             }
 
-            // 页面信息
             if (uiState.currentPage > 0) {
                 Text(
                     text = if (uiState.totalPages <= 1)
-                        "find ${uiState.albums.size} albums"
+                        stringResource(R.string.home_page_info_count, uiState.albums.size)
                     else
-                        "page ${uiState.currentPage}/${uiState.totalPages}",
+                        stringResource(R.string.home_page_info_pages, uiState.currentPage, uiState.totalPages),
                     color = Color(0xFFAAAAAA),
                     fontSize = 14.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
 
-            // 专辑列表
             Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
                 when {
                     uiState.isLoading -> {
-                        // 加载中
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -165,18 +162,17 @@ fun HomeScreen(
                     }
 
                     uiState.error != null -> {
-                        // 错误状态
                         Column(
                             modifier = Modifier.fillMaxSize(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "Error when searching",
+                                text = errorTitle,
                                 color = Color.White
                             )
                             Text(
-                                text = uiState.error ?: "",
+                                text = uiState.error ?: unknownError,
                                 color = Color(0xFFAAAAAA),
                                 fontSize = 14.sp
                             )
@@ -187,26 +183,24 @@ fun HomeScreen(
                                     containerColor = Color(0xFF6D28D9)
                                 )
                             ) {
-                                Text("retry")
+                                Text(stringResource(R.string.action_retry))
                             }
                         }
                     }
 
                     uiState.albums.isEmpty() && uiState.currentPage > 0 -> {
-                        // 没有结果
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No results found",
+                                text = noResultsText,
                                 color = Color(0xFFAAAAAA)
                             )
                         }
                     }
 
                     uiState.albums.isNotEmpty() -> {
-                        // 显示专辑列表
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(vertical = 8.dp),
@@ -214,13 +208,11 @@ fun HomeScreen(
                         ) {
                             items(
                                 items = uiState.albums,
-                                key = { album -> album.url } // 添加 key，使用 album.url 作为唯一标识符
+                                key = { album -> album.url }
                             ) { album ->
                                 AlbumItem(album = album, onAlbumClick = { clickedAlbum ->
-                                    // Encode URL and Title to be safe navigation arguments
                                     val encodedUrl = java.net.URLEncoder.encode(clickedAlbum.url, "UTF-8")
                                     val encodedTitle = java.net.URLEncoder.encode(clickedAlbum.title, "UTF-8")
-                                    // Navigate to album screen
                                     navController.navigate("album_screen/$encodedUrl/$encodedTitle")
                                 })
                             }
@@ -233,7 +225,7 @@ fun HomeScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Please enter an artist name",
+                                text = initialPromptText,
                                 color = Color(0xFFAAAAAA)
                             )
                         }
@@ -241,7 +233,6 @@ fun HomeScreen(
                 }
             }
 
-            // 分页控件
             if (uiState.totalPages > 1) {
                 PaginationControls(
                     currentPage = uiState.currentPage,
@@ -271,7 +262,6 @@ fun AlbumItem(album: Album, onAlbumClick: (Album) -> Unit) {
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 专辑图标
             Box(
                 modifier = Modifier
                     .size(28.dp)
@@ -287,7 +277,6 @@ fun AlbumItem(album: Album, onAlbumClick: (Album) -> Unit) {
                 )
             }
 
-            // 专辑信息
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -303,13 +292,12 @@ fun AlbumItem(album: Album, onAlbumClick: (Album) -> Unit) {
                 )
 
                 Text(
-                    text = "${album.file} files",
+                    text = stringResource(R.string.home_album_file_count, album.file),
                     color = Color(0xFFAAAAAA),
                     fontSize = 12.sp
                 )
             }
 
-            // 箭头图标
             Icon(
                 painter = painterResource(id = R.drawable.ic_chevron_right),
                 contentDescription = null,
@@ -326,6 +314,7 @@ fun PaginationControls(
     totalPages: Int,
     onPageSelected: (Int) -> Unit
 ) {
+    val ellipsis = stringResource(R.string.home_pagination_ellipsis)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -333,31 +322,29 @@ fun PaginationControls(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 上一页按钮
         PaginationButton(
-            text = "←",
+            text = stringResource(R.string.home_pagination_previous),
             onClick = { onPageSelected(currentPage - 1) },
             enabled = currentPage > 1
         )
-        
-        // 页码按钮
+
         val visiblePages = calculateVisiblePages(currentPage, totalPages)
-        
+
         if (visiblePages.first > 1) {
             PaginationButton(
                 text = "1",
                 onClick = { onPageSelected(1) }
             )
-            
+
             if (visiblePages.first > 2) {
                 Text(
-                    text = "...",
+                    text = ellipsis,
                     color = Color(0xFFAAAAAA),
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
         }
-        
+
         for (page in visiblePages.first..visiblePages.second) {
             PaginationButton(
                 text = page.toString(),
@@ -365,25 +352,24 @@ fun PaginationControls(
                 isSelected = page == currentPage
             )
         }
-        
+
         if (visiblePages.second < totalPages) {
             if (visiblePages.second < totalPages - 1) {
                 Text(
-                    text = "...",
+                    text = ellipsis,
                     color = Color(0xFFAAAAAA),
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
-            
+
             PaginationButton(
                 text = totalPages.toString(),
                 onClick = { onPageSelected(totalPages) }
             )
         }
-        
-        // 下一页按钮
+
         PaginationButton(
-            text = "→",
+            text = stringResource(R.string.home_pagination_next),
             onClick = { onPageSelected(currentPage + 1) },
             enabled = currentPage < totalPages
         )
@@ -402,7 +388,7 @@ fun PaginationButton(
         isSelected -> Color(0xFF6D28D9)
         else -> Color(0xFF1E1E1E)
     }
-    
+
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -425,10 +411,10 @@ fun PaginationButton(
 private fun calculateVisiblePages(currentPage: Int, totalPages: Int): Pair<Int, Int> {
     val isMobile = LocalConfiguration.current.screenWidthDp <= 640
     val pageRange = if (isMobile) 1 else 2
-    
+
     var startPage = Math.max(1, currentPage - pageRange)
     var endPage = Math.min(totalPages, currentPage + pageRange)
-    
+
     if (endPage - startPage < pageRange * 2 && totalPages > pageRange * 2 + 1) {
         if (startPage == 1) {
             endPage = Math.min(1 + pageRange * 2, totalPages)
@@ -436,6 +422,6 @@ private fun calculateVisiblePages(currentPage: Int, totalPages: Int): Pair<Int, 
             startPage = Math.max(1, totalPages - pageRange * 2)
         }
     }
-    
+
     return Pair(startPage, endPage)
 }

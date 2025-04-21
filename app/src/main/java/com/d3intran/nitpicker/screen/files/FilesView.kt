@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource // Import stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp // Import for sp unit
@@ -39,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField // Add for TextField
 import androidx.compose.material3.TextButton // Add for Dialog buttons
 import androidx.compose.foundation.border // Add import for border
 import androidx.compose.material3.OutlinedTextFieldDefaults // Add import for TextField colors
+import com.d3intran.nitpicker.R // Import R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -68,6 +70,10 @@ fun FilesScreen(
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var createFolderDialogError by remember { mutableStateOf<String?>(null) }
 
+    val unknownError = stringResource(R.string.error_unknown)
+    val errorLoadingFolders = stringResource(R.string.files_error_title)
+    val noFoldersFound = stringResource(R.string.files_empty)
+
     // Log composition lifecycle
     DisposableEffect(Unit) {
         Log.d("CompositionLifecycle", "FilesScreen Composed")
@@ -81,7 +87,7 @@ fun FilesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Files") },
+                title = { Text(stringResource(R.string.files_title)) },
                 navigationIcon = {
                     IconButton(
                         onClick = {
@@ -112,7 +118,7 @@ fun FilesScreen(
                         // Disable button while navigating back
                         enabled = !isNavigatingBack
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
@@ -122,7 +128,7 @@ fun FilesScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "Create Folder",
+                            contentDescription = stringResource(R.string.files_create_folder_cd),
                             tint = Color.White // Ensure icon is visible
                         )
                     }
@@ -163,11 +169,11 @@ fun FilesScreen(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "Error loading folders",
+                                text = errorLoadingFolders,
                                 color = Color.White
                             )
                             Text(
-                                text = uiState.error ?: "Unknown error",
+                                text = uiState.error ?: unknownError,
                                 color = Color(0xFFAAAAAA),
                                 fontSize = 14.sp
                             )
@@ -178,7 +184,7 @@ fun FilesScreen(
                                     containerColor = Color(0xFF6D28D9)
                                 )
                             ) {
-                                Text("Retry")
+                                Text(stringResource(R.string.action_retry))
                             }
                         }
                     }
@@ -189,7 +195,7 @@ fun FilesScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No folders found",
+                                text = noFoldersFound,
                                 color = Color(0xFFAAAAAA)
                             )
                         }
@@ -346,7 +352,7 @@ fun FolderItemRow(
             ) {
                 Icon(
                     imageVector = Icons.Default.Folder,
-                    contentDescription = "Folder",
+                    contentDescription = stringResource(R.string.folder),
                     tint = Color.White,
                     modifier = Modifier.size(28.dp)
                 )
@@ -378,11 +384,11 @@ fun FolderItemRow(
             tonalElevation = 0.dp
         ) {
             DropdownMenuItem(
-                text = { Text("Rename", color = Color.White) },
+                text = { Text(stringResource(R.string.action_rename), color = Color.White) },
                 onClick = onRenameClick
             )
             DropdownMenuItem(
-                text = { Text("Delete", color = Color(0xFFF44336)) },
+                text = { Text(stringResource(R.string.action_delete), color = Color(0xFFF44336)) },
                 onClick = onDeleteClick
             )
         }
@@ -399,10 +405,11 @@ fun RenameFolderDialog(
 ) {
     var newName by remember(currentName) { mutableStateOf(currentName) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    val invalidNameError = stringResource(R.string.files_rename_dialog_invalid)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename Folder") },
+        title = { Text(stringResource(R.string.files_rename_dialog_title)) },
         text = {
             Column {
                 OutlinedTextField(
@@ -410,12 +417,12 @@ fun RenameFolderDialog(
                     onValueChange = {
                         newName = it
                         errorText = if (it.isBlank() || it.contains("/") || it.contains("\\")) {
-                            "Invalid name"
+                            invalidNameError
                         } else {
                             null
                         }
                     },
-                    label = { Text("New folder name") },
+                    label = { Text(stringResource(R.string.files_rename_dialog_label)) },
                     singleLine = true,
                     isError = errorText != null,
                     // Customize colors for dark background
@@ -452,7 +459,7 @@ fun RenameFolderDialog(
                 // Add padding to make button larger
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("Rename", fontSize = 16.sp) // Slightly larger font size
+                Text(stringResource(R.string.action_rename), fontSize = 16.sp) // Slightly larger font size
             }
         },
         dismissButton = {
@@ -461,7 +468,7 @@ fun RenameFolderDialog(
                 // Add padding to make button larger
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("Cancel", fontSize = 16.sp) // Slightly larger font size
+                Text(stringResource(R.string.action_cancel), fontSize = 16.sp) // Slightly larger font size
             }
         },
         containerColor = Color(0xFF2A2A2A),
@@ -479,15 +486,15 @@ fun DeleteConfirmationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete Folder") },
-        text = { Text("Are you sure you want to permanently delete the folder \"$folderName\" and all its contents?") },
+        title = { Text(stringResource(R.string.files_delete_dialog_title)) },
+        text = { Text(stringResource(R.string.files_delete_dialog_message, folderName)) },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 // Use red color for confirmation button text
-                Text("Delete", color = Color(0xFFF44336), fontSize = 16.sp)
+                Text(stringResource(R.string.action_delete), color = Color(0xFFF44336), fontSize = 16.sp)
             }
         },
         dismissButton = {
@@ -495,7 +502,7 @@ fun DeleteConfirmationDialog(
                 onClick = onDismiss,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("Cancel", fontSize = 16.sp)
+                Text(stringResource(R.string.action_cancel), fontSize = 16.sp)
             }
         },
         containerColor = Color(0xFF2A2A2A),
@@ -514,11 +521,12 @@ fun CreateFolderDialog(
 ) {
     var folderName by remember { mutableStateOf("") }
     var textFieldError by remember { mutableStateOf<String?>(null) }
+    val nameEmptyError = stringResource(R.string.files_create_dialog_empty)
     val combinedError = dialogError ?: textFieldError // Prioritize external error
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create New Folder") },
+        title = { Text(stringResource(R.string.files_create_dialog_title)) },
         text = {
             Column {
                 OutlinedTextField(
@@ -526,12 +534,12 @@ fun CreateFolderDialog(
                     onValueChange = {
                         folderName = it
                         textFieldError = if (it.isBlank()) {
-                            "Name cannot be empty"
+                            nameEmptyError
                         } else {
                             null
                         }
                     },
-                    label = { Text("Folder name") },
+                    label = { Text(stringResource(R.string.files_create_dialog_label)) },
                     singleLine = true,
                     isError = combinedError != null,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -562,13 +570,13 @@ fun CreateFolderDialog(
                     if (textFieldError == null && folderName.isNotBlank()) {
                         onConfirm(folderName.trim())
                     } else if (folderName.isBlank()) {
-                        textFieldError = "Name cannot be empty"
+                        textFieldError = nameEmptyError
                     }
                 },
                 enabled = folderName.isNotBlank(),
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("Create", fontSize = 16.sp)
+                Text(stringResource(R.string.action_create), fontSize = 16.sp)
             }
         },
         dismissButton = {
@@ -576,7 +584,7 @@ fun CreateFolderDialog(
                 onClick = onDismiss,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
-                Text("Cancel", fontSize = 16.sp)
+                Text(stringResource(R.string.action_cancel), fontSize = 16.sp)
             }
         },
         containerColor = Color(0xFF2A2A2A),

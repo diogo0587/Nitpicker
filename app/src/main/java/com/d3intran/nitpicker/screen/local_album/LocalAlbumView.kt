@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +51,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import com.d3intran.nitpicker.R
 import com.d3intran.nitpicker.model.FileType
 import com.d3intran.nitpicker.model.LocalFileItem
 import com.d3intran.nitpicker.screen.files.FolderItem
@@ -107,6 +109,13 @@ fun LocalAlbumScreen(
         }
     }
 
+    val defaultTitle = stringResource(R.string.local_album_default_title)
+    val snackbarNoMoveTarget = stringResource(R.string.local_album_snackbar_no_move_target)
+    val snackbarPlayerError = stringResource(R.string.local_album_snackbar_player_error)
+    val snackbarIndexError = stringResource(R.string.local_album_snackbar_index_error)
+    val snackbarImageViewerNYI = stringResource(R.string.local_album_snackbar_image_viewer_nyi)
+    val emptyFolderText = stringResource(R.string.local_album_empty)
+
     Scaffold(
         topBar = {
             if (uiState.isSelectionModeActive) {
@@ -128,7 +137,7 @@ fun LocalAlbumScreen(
                             if (moveTargetFolders.isNotEmpty()) {
                                 showMoveDialog = true
                             } else {
-                                snackbarHostState.showSnackbar("No other folders available to move to.")
+                                snackbarHostState.showSnackbar(snackbarNoMoveTarget)
                             }
                         }
                     },
@@ -138,20 +147,20 @@ fun LocalAlbumScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = uiState.folderName.ifEmpty { "Local Files" },
+                            text = uiState.folderName.ifEmpty { defaultTitle },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                         }
                     },
                     actions = {
                         Box {
                             IconButton(onClick = { showNormalActionMenu = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = "More Actions")
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more_actions))
                             }
                             DropdownMenu(
                                 expanded = showNormalActionMenu,
@@ -159,12 +168,12 @@ fun LocalAlbumScreen(
                                 modifier = Modifier.background(Color(0xFF2C2C2C))
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Select", color = Color.White) },
+                                    text = { Text(stringResource(R.string.action_select), color = Color.White) },
                                     onClick = {
                                         viewModel.enterSelectionMode()
                                         showNormalActionMenu = false
                                     },
-                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = "Select", tint = Color.White) }
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_select), tint = Color.White) }
                                 )
                             }
                         }
@@ -196,14 +205,14 @@ fun LocalAlbumScreen(
                     }
                     uiState.error != null -> {
                         LocalErrorState(
-                            errorMessage = uiState.error ?: "An unknown error occurred.",
+                            errorMessage = uiState.error ?: stringResource(R.string.error_unknown),
                             onRetry = { viewModel.retry() }
                         )
                     }
                     uiState.files.isEmpty() && !uiState.isLoading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
-                                text = "No images or videos found in this folder.",
+                                text = emptyFolderText,
                                 color = Color(0xFFAAAAAA),
                                 textAlign = TextAlign.Center
                             )
@@ -239,20 +248,20 @@ fun LocalAlbumScreen(
                                                     navController.navigate("player_screen/$encodedFolderPath/$initialIndex")
                                                 } else {
                                                     scope.launch {
-                                                        snackbarHostState.showSnackbar("Could not open video player.")
+                                                        snackbarHostState.showSnackbar(snackbarPlayerError)
                                                     }
                                                 }
                                             } else {
                                                 Log.e("LocalAlbumScreen", "Clicked video not found in filtered list: ${file.path}")
                                                 scope.launch {
-                                                    snackbarHostState.showSnackbar("Error finding video index.")
+                                                    snackbarHostState.showSnackbar(snackbarIndexError)
                                                 }
                                             }
                                         }
                                         FileType.IMAGE -> {
                                             Log.d("LocalAlbumScreen", "Clicked on image (view mode): ${file.name}")
                                             scope.launch {
-                                                snackbarHostState.showSnackbar("Image viewer not implemented yet.")
+                                                snackbarHostState.showSnackbar(snackbarImageViewerNYI)
                                             }
                                         }
                                     }
@@ -309,16 +318,16 @@ fun SelectionTopAppBar(
     onDeleteClick: () -> Unit
 ) {
     TopAppBar(
-        title = { Text("$selectedCount selected") },
+        title = { Text(stringResource(R.string.selected_count, selectedCount)) },
         navigationIcon = {
             IconButton(onClick = onCancelClick) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel Selection")
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.local_album_selection_cancel_cd))
             }
         },
         actions = {
             Box {
                 IconButton(onClick = onActionMenuClick) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Actions")
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.actions))
                 }
                 DropdownMenu(
                     expanded = showMenu,
@@ -326,18 +335,18 @@ fun SelectionTopAppBar(
                     modifier = Modifier.background(Color(0xFF2C2C2C))
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Select All", color = Color.White) },
+                        text = { Text(stringResource(R.string.action_select_all), color = Color.White) },
                         onClick = onSelectAllClick,
                         leadingIcon = { Icon(Icons.Default.SelectAll, contentDescription = null, tint = Color.White) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Move", color = if (selectedCount > 0) Color.White else Color.Gray) },
+                        text = { Text(stringResource(R.string.action_move), color = if (selectedCount > 0) Color.White else Color.Gray) },
                         onClick = onMoveClick,
                         enabled = selectedCount > 0,
                         leadingIcon = { Icon(Icons.Default.DriveFileMove, contentDescription = null, tint = if (selectedCount > 0) Color.White else Color.Gray) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Delete", color = if (selectedCount > 0) Color(0xFFF44336) else Color.Gray) },
+                        text = { Text(stringResource(R.string.action_delete), color = if (selectedCount > 0) Color(0xFFF44336) else Color.Gray) },
                         onClick = onDeleteClick,
                         enabled = selectedCount > 0,
                         leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = if (selectedCount > 0) Color(0xFFF44336) else Color.Gray) }
@@ -378,7 +387,8 @@ fun LocalFilesGrid(
                 fileInfo = file,
                 isSelected = isSelected,
                 onClick = { onFileClick(file) },
-                onLongClick = { onFileLongClick(file) }
+                onLongClick = { onFileLongClick(file)
+                }
             )
         }
     }
@@ -478,7 +488,7 @@ fun LocalFileItemRow(
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = "Selected",
+                    contentDescription = stringResource(R.string.selected_content_description),
                     tint = Color(0xFF6D28D9),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -504,16 +514,16 @@ fun DeleteConfirmationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete Files") },
-        text = { Text("Are you sure you want to permanently delete $count selected file(s)? This action cannot be undone.") },
+        title = { Text(stringResource(R.string.local_album_delete_dialog_title)) },
+        text = { Text(stringResource(R.string.local_album_delete_dialog_message, count)) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Delete", color = Color(0xFFF44336))
+                Text(stringResource(R.string.action_delete), color = Color(0xFFF44336))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         },
         containerColor = Color(0xFF2A2A2A),
@@ -531,10 +541,10 @@ fun MoveTargetDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Move to Folder") },
+        title = { Text(stringResource(R.string.local_album_move_dialog_title)) },
         text = {
             if (folders.isEmpty()) {
-                Text("No other folders available.", color = Color(0xFFAAAAAA))
+                Text(stringResource(R.string.local_album_move_dialog_empty), color = Color(0xFFAAAAAA))
             } else {
                 LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                     items(items = folders, key = { folder -> folder.path }) { folder ->
@@ -553,11 +563,10 @@ fun MoveTargetDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {}) { }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.action_cancel))
             }
         },
         containerColor = Color(0xFF2A2A2A),
@@ -602,7 +611,7 @@ fun LocalErrorState(errorMessage: String, onRetry: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Error Loading Folder",
+            text = stringResource(R.string.local_album_error_title),
             color = Color.White,
             fontSize = 18.sp,
             textAlign = TextAlign.Center
@@ -619,7 +628,7 @@ fun LocalErrorState(errorMessage: String, onRetry: () -> Unit) {
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9))
         ) {
-            Text("Retry")
+            Text(stringResource(R.string.action_retry))
         }
     }
 }

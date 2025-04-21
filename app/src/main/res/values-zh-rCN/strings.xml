@@ -1,7 +1,10 @@
-<!-- filepath: e:\Android\nitpicker\app\src\main\res\values-zh-rCN\strings.xml -->
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Nitpicker</string>
+
+    <string name="drawer_home">首页</string>
+    <string name="drawer_downloads">下载</string>
+    <string name="drawer_files">文件</string>
 
     <!-- Common Actions -->
     <string name="action_back">返回</string>
@@ -34,7 +37,7 @@
     <string name="home_error_title">搜索时出错</string>
     <string name="home_no_results">未找到结果</string>
     <string name="home_album_file_count">%1$d 个文件</string>
-    <string name="home_initial_prompt">请输入艺术家名称</string>
+    <string name="home_initial_prompt">请输入博主名称</string>
     <string name="home_pagination_previous">←</string>
     <string name="home_pagination_next">→</string>
     <string name="home_pagination_ellipsis">…</string>

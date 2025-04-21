@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import com.d3intran.nitpicker.R
 import com.d3intran.nitpicker.model.FileInfo
 import android.app.Activity
 import android.content.Context
@@ -73,6 +75,9 @@ fun AlbumScreen(
     // State for back navigation debounce
     var isNavigatingBack by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    val emptyFilterText = stringResource(R.string.album_empty_filter)
+    val emptyAlbumText = stringResource(R.string.album_empty)
 
     LaunchedEffect(Unit) {
         albumViewModel.snackbarMessages.collectLatest { message ->
@@ -131,7 +136,7 @@ fun AlbumScreen(
                         // Disable button while navigating back
                         enabled = !isNavigatingBack
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 actions = {
@@ -165,7 +170,7 @@ fun AlbumScreen(
                     ) {
                         Icon(
                             Icons.Filled.Download,
-                            contentDescription = if (isAnythingSelected) "Download selected files" else "Open Download Manager"
+                            contentDescription = if (isAnythingSelected) stringResource(R.string.album_download_selected) else stringResource(R.string.album_open_download_manager)
                         )
                     }
                 },
@@ -203,7 +208,7 @@ fun AlbumScreen(
                     }
                     uiState.error != null -> {
                         ErrorState(
-                            errorMessage = uiState.error ?: "An unknown error occurred.",
+                            errorMessage = uiState.error ?: stringResource(R.string.error_unknown),
                             onRetry = { albumViewModel.retry() }
                         )
                     }
@@ -216,7 +221,7 @@ fun AlbumScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "No files match the current filter.",
+                                    text = emptyFilterText,
                                     color = Color(0xFFAAAAAA),
                                     textAlign = TextAlign.Center
                                 )
@@ -227,7 +232,7 @@ fun AlbumScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "No files found in this album.",
+                                    text = emptyAlbumText,
                                     color = Color(0xFFAAAAAA),
                                     textAlign = TextAlign.Center
                                 )
@@ -265,7 +270,7 @@ fun FilterControls(
         FilterChip(
             selected = isAllSelected,
             onClick = { onFilterSelected(FilterType.ALL) },
-            label = { Text("All") },
+            label = { Text(stringResource(R.string.album_filter_all)) },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = Color(0xFF3A2F4C),
                 selectedLabelColor = Color.White,
@@ -287,7 +292,7 @@ fun FilterControls(
         FilterChip(
             selected = isImagesSelected,
             onClick = { onFilterSelected(FilterType.IMAGES) },
-            label = { Text("Images") },
+            label = { Text(stringResource(R.string.album_filter_images)) },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = Color(0xFF3A2F4C),
                 selectedLabelColor = Color.White,
@@ -308,7 +313,7 @@ fun FilterControls(
         FilterChip(
             selected = isOtherSelected,
             onClick = { onFilterSelected(FilterType.OTHER) },
-            label = { Text("Other") },
+            label = { Text(stringResource(R.string.album_filter_other)) },
             colors = FilterChipDefaults.filterChipColors(
                 selectedContainerColor = Color(0xFF3A2F4C),
                 selectedLabelColor = Color.White,
@@ -441,7 +446,7 @@ fun FileItem(
                 isQueued -> {
                     Icon(
                         imageVector = Icons.Filled.DownloadDone,
-                        contentDescription = "Queued for download",
+                        contentDescription = stringResource(R.string.album_item_queued),
                         tint = Color.Gray,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -453,7 +458,7 @@ fun FileItem(
                 isSelected -> {
                     Icon(
                         imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = "Selected",
+                        contentDescription = stringResource(R.string.selected_content_description),
                         tint = Color(0xFF6D28D9),
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -492,7 +497,7 @@ fun ErrorState(errorMessage: String, onRetry: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Error Loading Files",
+            text = stringResource(R.string.album_error_title),
             color = Color.White,
             fontSize = 18.sp,
             textAlign = TextAlign.Center
@@ -509,7 +514,7 @@ fun ErrorState(errorMessage: String, onRetry: () -> Unit) {
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9))
         ) {
-            Text("Retry")
+            Text(stringResource(R.string.action_retry))
         }
     }
 }
