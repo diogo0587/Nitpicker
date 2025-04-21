@@ -26,6 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
@@ -48,7 +49,10 @@ fun PlayerScreen(
         window?.let { WindowCompat.getInsetsController(it, view) }
     }
 
-    val exoPlayer = remember { ExoPlayer.Builder(context).build() }
+    val exoPlayer = remember {
+        Log.d("PlayerLifecycle", "Creating ExoPlayer instance")
+        ExoPlayer.Builder(context).build()
+    }
 
     LaunchedEffect(isControllerVisible, windowInsetsController) {
         if (windowInsetsController == null) return@LaunchedEffect
@@ -68,12 +72,14 @@ fun PlayerScreen(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 Log.d("ExoPlayerState", "Playback state changed: $playbackState")
                 viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
+                if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
+                    viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, exoPlayer.playWhenReady, exoPlayer.currentMediaItemIndex)
+                }
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                if (exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
-                    viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, playWhenReady)
-                }
+                Log.d("ExoPlayerState", "PlayWhenReady changed: $playWhenReady, Reason: $reason")
+                viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, playWhenReady, exoPlayer.currentMediaItemIndex)
                 viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
             }
 
@@ -82,19 +88,22 @@ fun PlayerScreen(
                 newPosition: Player.PositionInfo,
                 reason: Int
             ) {
+                Log.d("ExoPlayerState", "Position discontinuity: Reason $reason, NewPos ${newPosition.positionMs}")
                 if (reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
-                    viewModel.saveCurrentPlaybackState(newPosition.positionMs, exoPlayer.playWhenReady)
+                    viewModel.saveCurrentPlaybackState(newPosition.positionMs, exoPlayer.playWhenReady, newPosition.mediaItemIndex)
                 }
                 viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                Log.d("ExoPlayerState", "MediaItem transition, new item: ${mediaItem?.mediaMetadata?.title}, reason: $reason")
-                viewModel.onMediaItemTransition(mediaItem)
+                val newIndex = exoPlayer.currentMediaItemIndex
+                Log.d("ExoPlayerState", "MediaItem transition, new item: ${mediaItem?.mediaMetadata?.title}, newIndex: $newIndex, reason: $reason")
+                viewModel.onMediaItemTransition(mediaItem, newIndex, reason)
                 viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
             }
 
-            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+            override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                Log.d("ExoPlayerState", "Timeline changed, Reason: $reason")
                 viewModel.updateNavigationButtonStates(exoPlayer.hasNextMediaItem(), exoPlayer.hasPreviousMediaItem())
             }
         }
@@ -103,16 +112,19 @@ fun PlayerScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
-                    Log.d("PlayerLifecycle", "ON_STOP: Saving state and pausing.")
-                    if (exoPlayer.playbackState != Player.STATE_IDLE && exoPlayer.playbackState != Player.STATE_ENDED) {
-                        viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, exoPlayer.playWhenReady)
-                    }
-                    if (exoPlayer.isPlaying) {
-                        exoPlayer.pause()
+                    Log.d("PlayerLifecycle", "ON_STOP: Saving state. Player Playing: ${exoPlayer.isPlaying}")
+                    if (exoPlayer.playbackState != Player.STATE_IDLE) {
+                        viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, exoPlayer.playWhenReady, exoPlayer.currentMediaItemIndex)
                     }
                 }
                 Lifecycle.Event.ON_START -> {
                     Log.d("PlayerLifecycle", "ON_START: Player will resume if playWhenReady is true.")
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    Log.d("PlayerLifecycle", "ON_PAUSE: Saving state.")
+                    if (exoPlayer.playbackState != Player.STATE_IDLE) {
+                        viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, exoPlayer.playWhenReady, exoPlayer.currentMediaItemIndex)
+                    }
                 }
                 else -> {}
             }
@@ -120,31 +132,42 @@ fun PlayerScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
-            Log.d("PlayerLifecycle", "ON_DISPOSE: Saving final state and releasing player.")
+            Log.d("PlayerLifecycle", "ON_DISPOSE: Releasing player.")
             lifecycleOwner.lifecycle.removeObserver(observer)
             exoPlayer.removeListener(listener)
-            if (exoPlayer.playbackState != Player.STATE_IDLE) {
-                try {
-                    viewModel.saveCurrentPlaybackState(exoPlayer.currentPosition, exoPlayer.playWhenReady)
-                } catch (e: Exception) {
-                    Log.e("PlayerLifecycle", "Error saving state on dispose", e)
-                }
-            }
             exoPlayer.release()
             Log.d("PlayerLifecycle", "Player released.")
         }
     }
 
-    LaunchedEffect(uiState.mediaItems, uiState.initialWindowIndex, exoPlayer) {
+    LaunchedEffect(uiState.mediaItems, uiState.currentWindowIndex, uiState.playbackPosition, uiState.playWhenReady) {
         if (uiState.mediaItems.isNotEmpty()) {
-            Log.d("PlayerSetup", "Setting media items. Count: ${uiState.mediaItems.size}, Start Index: ${uiState.initialWindowIndex}, Start Pos: ${uiState.playbackPosition}")
-            exoPlayer.setMediaItems(uiState.mediaItems, uiState.initialWindowIndex, uiState.playbackPosition)
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = uiState.playWhenReady
-            Log.d("PlayerSetup", "Player prepared. playWhenReady set to: ${uiState.playWhenReady}")
+            val currentMediaId = exoPlayer.currentMediaItem?.mediaId
+            val targetMediaId = uiState.mediaItems.getOrNull(uiState.currentWindowIndex)?.mediaId
+            val needsMediaItemSet = exoPlayer.mediaItemCount != uiState.mediaItems.size || currentMediaId != targetMediaId || exoPlayer.currentMediaItemIndex != uiState.currentWindowIndex
+
+            if (needsMediaItemSet) {
+                Log.d("PlayerSetup", "Setting media items. Count: ${uiState.mediaItems.size}, Start Index: ${uiState.currentWindowIndex}, Start Pos: ${uiState.playbackPosition}")
+                exoPlayer.setMediaItems(uiState.mediaItems, uiState.currentWindowIndex, uiState.playbackPosition)
+                exoPlayer.prepare()
+            } else {
+                Log.d("PlayerSetup", "Media items already set. Seeking if necessary.")
+                if (kotlin.math.abs(exoPlayer.currentPosition - uiState.playbackPosition) > 1000) {
+                    exoPlayer.seekTo(uiState.currentWindowIndex, uiState.playbackPosition)
+                }
+            }
+
+            if (exoPlayer.playWhenReady != uiState.playWhenReady) {
+                Log.d("PlayerSetup", "Applying playWhenReady state: ${uiState.playWhenReady}")
+                exoPlayer.playWhenReady = uiState.playWhenReady
+            } else {
+                Log.d("PlayerSetup", "playWhenReady state already matches: ${uiState.playWhenReady}")
+            }
+
         } else if (!uiState.isLoading) {
-            Log.d("PlayerSetup", "MediaItems list is empty, clearing player.")
+            Log.d("PlayerSetup", "MediaItems list is empty or loading finished with no items, clearing player.")
             exoPlayer.clearMediaItems()
+            exoPlayer.stop()
         }
     }
 
@@ -182,15 +205,14 @@ fun PlayerScreen(
             contentAlignment = Alignment.Center
         ) {
             val currentUiState = uiState
-            val currentError = currentUiState.error
 
             when {
-                currentUiState.isLoading -> {
+                currentUiState.isLoading && currentUiState.mediaItems.isEmpty() -> {
                     CircularProgressIndicator(color = Color.White)
                 }
-                currentError != null -> {
+                currentUiState.error != null -> {
                     Text(
-                        text = currentError,
+                        text = currentUiState.error,
                         color = Color.Red,
                         modifier = Modifier.padding(16.dp)
                     )
@@ -198,9 +220,11 @@ fun PlayerScreen(
                 currentUiState.mediaItems.isNotEmpty() -> {
                     AndroidView(
                         factory = { ctx ->
+                            Log.d("PlayerView", "AndroidView Factory creating PlayerView")
                             PlayerView(ctx).apply {
                                 player = exoPlayer
                                 useController = true
+                                controllerShowTimeoutMs = 3000
                                 setControllerVisibilityListener(
                                     PlayerView.ControllerVisibilityListener { visibility ->
                                         Log.d("PlayerView", "Controller visibility changed: $visibility")
@@ -210,6 +234,7 @@ fun PlayerScreen(
                             }
                         },
                         update = { playerView ->
+                            Log.d("PlayerView", "AndroidView Update. Player set.")
                             playerView.player = exoPlayer
                             playerView.setControllerVisibilityListener(
                                 PlayerView.ControllerVisibilityListener { visibility ->
@@ -221,7 +246,7 @@ fun PlayerScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-                else -> {
+                !currentUiState.isLoading && currentUiState.mediaItems.isEmpty() && currentUiState.error == null -> {
                     Text("No video found or playlist empty.", color = Color.Gray)
                 }
             }

@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +29,7 @@ data class PlayerUiState(
     val playWhenReady: Boolean = true,
     val isLoading: Boolean = true,
     val mediaItems: List<MediaItem> = emptyList(),
-    val initialWindowIndex: Int = 0,
+    val currentWindowIndex: Int = 0,
     val isNextEnabled: Boolean = false,
     val isPreviousEnabled: Boolean = false
 )
@@ -44,23 +45,35 @@ class PlayerViewModel @Inject constructor(
 
     private val videoExtensions = setOf("mp4", "mkv", "avi", "mov", "wmv", "3gp")
 
-    private var restoredPosition: Long = 0L
-    private var restoredPlayWhenReady: Boolean = true
-
     init {
-        restoredPosition = savedStateHandle.get<Long>("playbackPosition") ?: 0L
-        restoredPlayWhenReady = savedStateHandle.get<Boolean>("playWhenReady") ?: true
-        Log.d("PlayerViewModel", "Init - Restored internal state: position=$restoredPosition, playWhenReady=$restoredPlayWhenReady")
+        val restoredPosition = savedStateHandle.get<Long>("playbackPosition") ?: 0L
+        val restoredPlayWhenReady = savedStateHandle.get<Boolean>("playWhenReady") ?: true
+        val restoredWindowIndex = savedStateHandle.get<Int>("currentWindowIndex") ?: 0
 
-        loadPlaylist()
+        Log.d("PlayerViewModel", "Init - Restored state: position=$restoredPosition, playWhenReady=$restoredPlayWhenReady, index=$restoredWindowIndex")
+
+        _uiState.update {
+            it.copy(
+                playbackPosition = restoredPosition,
+                playWhenReady = restoredPlayWhenReady,
+                currentWindowIndex = restoredWindowIndex
+            )
+        }
+
+        loadPlaylist(restoredWindowIndex)
     }
 
-    private fun loadPlaylist() {
+    private fun loadPlaylist(restoredIndex: Int) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            if (_uiState.value.mediaItems.isEmpty()) {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+            } else {
+                _uiState.update { it.copy(isLoading = false, error = null) }
+            }
+
             val encodedPath = savedStateHandle.get<String>("folderPath") ?: ""
-            val initialIndex = savedStateHandle.get<Int>("initialIndex") ?: 0
-            Log.d("PlayerViewModel", "Received encoded folder path: $encodedPath, initial index: $initialIndex")
+            val navInitialIndex = savedStateHandle.get<Int>("initialIndex") ?: 0
+            Log.d("PlayerViewModel", "loadPlaylist - Received path: $encodedPath, navInitialIndex: $navInitialIndex, restoredIndex: $restoredIndex")
 
             if (encodedPath.isNotEmpty()) {
                 try {
@@ -80,37 +93,46 @@ class PlayerViewModel @Inject constructor(
                                 .build()
                         }
 
-                        val validInitialIndex = if (initialIndex in mediaItems.indices) initialIndex else 0
+                        val startIndex = if (_uiState.value.mediaItems.isNotEmpty() && restoredIndex in mediaItems.indices) {
+                            Log.d("PlayerViewModel", "Using restored index: $restoredIndex")
+                            restoredIndex
+                        } else if (navInitialIndex in mediaItems.indices) {
+                            Log.d("PlayerViewModel", "Using navigation initial index: $navInitialIndex")
+                            navInitialIndex
+                        } else {
+                            Log.d("PlayerViewModel", "Using default index 0")
+                            0
+                        }
 
-                        val isRestoration = _uiState.value.mediaItems.isNotEmpty()
-                        val startPosition = if (isRestoration) restoredPosition else 0L
-                        val startPlayWhenReady = if (isRestoration) restoredPlayWhenReady else true
+                        val startPosition = _uiState.value.playbackPosition
+                        val startPlayWhenReady = _uiState.value.playWhenReady
 
-                        Log.d("PlayerViewModel", "Playlist loaded. isRestoration=$isRestoration, startPosition=$startPosition, startPlayWhenReady=$startPlayWhenReady")
+                        Log.d("PlayerViewModel", "Playlist loaded. StartIndex: $startIndex, StartPos: $startPosition, PlayReady: $startPlayWhenReady")
 
                         _uiState.update {
                             it.copy(
                                 mediaItems = mediaItems,
-                                initialWindowIndex = validInitialIndex,
-                                videoTitle = mediaItems.getOrNull(validInitialIndex)?.mediaMetadata?.title?.toString(),
+                                currentWindowIndex = startIndex,
+                                videoTitle = mediaItems.getOrNull(startIndex)?.mediaMetadata?.title?.toString(),
                                 isLoading = false,
                                 playbackPosition = startPosition,
                                 playWhenReady = startPlayWhenReady
                             )
                         }
-                        Log.d("PlayerViewModel", "Playlist loaded state updated. Size: ${mediaItems.size}, Index: $validInitialIndex, Pos: $startPosition, PlayReady: $startPlayWhenReady")
+                        Log.d("PlayerViewModel", "Playlist loaded state updated. Size: ${mediaItems.size}, Index: $startIndex, Pos: $startPosition, PlayReady: $startPlayWhenReady")
+                        savedStateHandle["currentWindowIndex"] = startIndex
 
                     } else {
                         Log.e("PlayerViewModel", "No video files found in folder: $folderPath")
-                        _uiState.update { it.copy(error = "No videos found in this folder.", isLoading = false) }
+                        _uiState.update { it.copy(error = "No videos found in this folder.", isLoading = false, mediaItems = emptyList()) }
                     }
                 } catch (e: Exception) {
                     Log.e("PlayerViewModel", "Error processing folder path or loading videos", e)
-                    _uiState.update { it.copy(error = "Could not load video playlist.", isLoading = false) }
+                    _uiState.update { it.copy(error = "Could not load video playlist.", isLoading = false, mediaItems = emptyList()) }
                 }
             } else {
                 Log.e("PlayerViewModel", "Folder path argument is missing.")
-                _uiState.update { it.copy(error = "Folder path not provided.", isLoading = false) }
+                _uiState.update { it.copy(error = "Folder path not provided.", isLoading = false, mediaItems = emptyList()) }
             }
         }
     }
@@ -132,16 +154,20 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun onMediaItemTransition(currentMediaItem: MediaItem?) {
+    fun onMediaItemTransition(currentMediaItem: MediaItem?, newIndex: Int, reason: Int) {
         val newTitle = currentMediaItem?.mediaMetadata?.title?.toString()
-        Log.d("PlayerViewModel", "MediaItem Transition. New Title: $newTitle. Resetting position to 0.")
-        restoredPosition = 0L
-        savedStateHandle["playbackPosition"] = 0L
+        Log.d("PlayerViewModel", "MediaItem Transition. New Title: $newTitle, New Index: $newIndex, Reason: $reason")
+
         _uiState.update {
             it.copy(
                 videoTitle = newTitle,
-                playbackPosition = 0L
+                currentWindowIndex = newIndex,
+                playbackPosition = if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) 0L else it.playbackPosition
             )
+        }
+        savedStateHandle["currentWindowIndex"] = newIndex
+        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_SEEK) {
+            savedStateHandle["playbackPosition"] = 0L
         }
     }
 
@@ -149,21 +175,29 @@ class PlayerViewModel @Inject constructor(
         _uiState.update { it.copy(isNextEnabled = hasNext, isPreviousEnabled = hasPrevious) }
     }
 
-    fun saveCurrentPlaybackState(position: Long, playWhenReady: Boolean) {
+    fun saveCurrentPlaybackState(position: Long, playWhenReady: Boolean, currentWindowIndex: Int) {
+        Log.d("PlayerViewModel", "Saving state: Pos=$position, PlayReady=$playWhenReady, Index=$currentWindowIndex")
         if (position >= 0) {
-            restoredPosition = position
             savedStateHandle["playbackPosition"] = position
         }
-        restoredPlayWhenReady = playWhenReady
         savedStateHandle["playWhenReady"] = playWhenReady
+        savedStateHandle["currentWindowIndex"] = currentWindowIndex
 
-        if (_uiState.value.playbackPosition != position || _uiState.value.playWhenReady != playWhenReady) {
-            _uiState.update { it.copy(playbackPosition = position, playWhenReady = playWhenReady) }
+        if (_uiState.value.playbackPosition != position ||
+            _uiState.value.playWhenReady != playWhenReady ||
+            _uiState.value.currentWindowIndex != currentWindowIndex) {
+            _uiState.update {
+                it.copy(
+                    playbackPosition = position,
+                    playWhenReady = playWhenReady,
+                    currentWindowIndex = currentWindowIndex
+                )
+            }
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        Log.d("PlayerViewModel", "onCleared - Final position saved was: $restoredPosition")
+        Log.d("PlayerViewModel", "onCleared - Final state saved: Pos=${savedStateHandle.get<Long>("playbackPosition")}, PlayReady=${savedStateHandle.get<Boolean>("playWhenReady")}, Index=${savedStateHandle.get<Int>("currentWindowIndex")}")
     }
 }

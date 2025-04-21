@@ -40,6 +40,7 @@ import com.d3intran.nitpicker.screen.player.PlayerScreen
 import com.d3intran.nitpicker.ui.theme.NitpickerTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -69,7 +70,10 @@ class MainActivity : ComponentActivity() {
                 Log.d("NavigationFlow", "Recomposed - Route: $currentRoute, Drawer: ${drawerState.currentValue}")
 
                 // Determine if the drawer gesture should be enabled
-                val gesturesEnabled = currentRoute != "player_screen/{videoPath}" // Disable drawer gesture on player screen
+                // Disable drawer gesture if the current route starts with "player_screen/"
+                val gesturesEnabled = currentRoute?.startsWith("player_screen/") != true
+                Log.d("NavigationFlow", "Gestures Enabled: $gesturesEnabled for route: $currentRoute")
+
 
                 val configuration = LocalConfiguration.current
                 val screenWidthDp = configuration.screenWidthDp.dp
@@ -99,20 +103,18 @@ class MainActivity : ComponentActivity() {
                                 currentRoute = currentRoute,
                                 navController = navController,
                                 closeDrawer = {
-                                    Log.d("DrawerAction", "[${System.currentTimeMillis()}] DrawerItem: Requesting drawer close. Current Drawer State: ${drawerState.currentValue}")
                                     scope.launch {
-                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.close()")
                                         try {
                                             drawerState.close()
-                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.close() completed.")
                                         } catch (e: Exception) {
-                                            Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error closing drawer", e)
+                                            Log.e("DrawerAction", "Error closing drawer", e)
                                         }
                                     }
                                 },
-                                lastNavTime = lastNavTime, // Pass state
-                                debounceDelay = debounceDelay, // Pass delay
-                                updateLastNavTime = { newTime -> lastNavTime = newTime } // Pass update lambda
+                                scope = scope, // <-- 传递 scope
+                                lastNavTime = lastNavTime,
+                                debounceDelay = debounceDelay,
+                                updateLastNavTime = { newTime -> lastNavTime = newTime }
                             )
                             DrawerItem(
                                 label = "Downloads",
@@ -121,17 +123,15 @@ class MainActivity : ComponentActivity() {
                                 currentRoute = currentRoute,
                                 navController = navController,
                                 closeDrawer = {
-                                    Log.d("DrawerAction", "[${System.currentTimeMillis()}] DrawerItem: Requesting drawer close. Current Drawer State: ${drawerState.currentValue}")
                                     scope.launch {
-                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.close()")
                                         try {
                                             drawerState.close()
-                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.close() completed.")
                                         } catch (e: Exception) {
-                                            Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error closing drawer", e)
+                                            Log.e("DrawerAction", "Error closing drawer", e)
                                         }
                                     }
                                 },
+                                scope = scope, // <-- 传递 scope
                                 lastNavTime = lastNavTime,
                                 debounceDelay = debounceDelay,
                                 updateLastNavTime = { newTime -> lastNavTime = newTime }
@@ -143,17 +143,15 @@ class MainActivity : ComponentActivity() {
                                 currentRoute = currentRoute,
                                 navController = navController,
                                 closeDrawer = {
-                                    Log.d("DrawerAction", "[${System.currentTimeMillis()}] DrawerItem: Requesting drawer close. Current Drawer State: ${drawerState.currentValue}")
                                     scope.launch {
-                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.close()")
                                         try {
                                             drawerState.close()
-                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.close() completed.")
                                         } catch (e: Exception) {
-                                            Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error closing drawer", e)
+                                            Log.e("DrawerAction", "Error closing drawer", e)
                                         }
                                     }
                                 },
+                                scope = scope, // <-- 传递 scope
                                 lastNavTime = lastNavTime,
                                 debounceDelay = debounceDelay,
                                 updateLastNavTime = { newTime -> lastNavTime = newTime }
@@ -172,14 +170,11 @@ class MainActivity : ComponentActivity() {
                                     navController = navController,
                                     homeViewModel = homeViewModel,
                                     openDrawer = {
-                                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] HomeScreen: Menu icon clicked. Current Drawer State: ${drawerState.currentValue}")
                                         scope.launch {
-                                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Attempting drawerState.open()")
                                             try {
                                                 drawerState.open()
-                                                Log.d("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: drawerState.open() completed.")
                                             } catch (e: Exception) {
-                                                Log.e("DrawerAction", "[${System.currentTimeMillis()}] Coroutine: Error opening drawer", e)
+                                                Log.e("DrawerAction", "Error opening drawer", e)
                                             }
                                         }
                                     }
@@ -211,12 +206,13 @@ class MainActivity : ComponentActivity() {
                                 LocalAlbumScreen(navController = navController)
                             }
                             composable(
-                                route = "player_screen/{folderPath}/{initialIndex}",
+                                route = "player_screen/{folderPath}/{initialIndex}", // Keep this route definition
                                 arguments = listOf(
                                     navArgument("folderPath") { type = NavType.StringType },
                                     navArgument("initialIndex") { type = NavType.IntType }
                                 )
                             ) { backStackEntry ->
+                                // PlayerScreen now correctly handles state restoration via ViewModel
                                 PlayerScreen(navController = navController)
                             }
                         }
@@ -236,6 +232,7 @@ fun DrawerItem(
     currentRoute: String?,
     navController: NavHostController,
     closeDrawer: () -> Unit,
+    scope: CoroutineScope, // <-- 确保参数已添加
     navigateOnClick: Boolean = true,
     // Debounce parameters
     lastNavTime: Long,
@@ -252,10 +249,16 @@ fun DrawerItem(
             if (currentTime - lastNavTime > debounceDelay) { // Check debounce time
                 updateLastNavTime(currentTime) // Update last navigation time
 
-                closeDrawer() // Close drawer first
-
                 if (navigateOnClick && currentRoute != route) {
                     Log.d("DrawerNav", "[${currentTime}] Debounced Navigating to '$route'")
+                    // Close drawer slightly after starting navigation to avoid visual glitch
+                    scope.launch { // Now scope is accessible
+                         try {
+                             closeDrawer()
+                         } catch (e: Exception) {
+                             Log.e("DrawerNav", "Error closing drawer in scope", e)
+                         }
+                    }
                     navController.navigate(route) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
@@ -264,7 +267,9 @@ fun DrawerItem(
                         restoreState = true
                     }
                 } else {
-                    Log.d("DrawerNav", "[${currentTime}] Skipping nav (already on route or !navigateOnClick)")
+                     // If not navigating, just close the drawer
+                     closeDrawer() // Use the passed lambda which captures the correct scope
+                    Log.d("DrawerNav", "[${currentTime}] Skipping nav (already on route or !navigateOnClick), closing drawer.")
                 }
             } else {
                 Log.d("DrawerNav", "[${currentTime}] Skipping nav (debounced)")
