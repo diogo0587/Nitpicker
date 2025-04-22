@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import kotlinx.coroutines.launch
 import android.util.Log
+import okhttp3.Headers
 
 // Helper function to find Activity from Context safely
 private fun Context.findActivity(): Activity? = when (this) {
@@ -408,15 +409,25 @@ fun FileItem(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            val context = LocalContext.current
+
+            val imageRequest = remember(fileInfo.thumbnailUrl) {
+                ImageRequest.Builder(context)
+                    .data(fileInfo.thumbnailUrl)
+                    .crossfade(true)
+                    .placeholder(ColorDrawable(placeholderColor.hashCode()))
+                    .error(ColorDrawable(errorColor.hashCode()))
+                    .headers(
+                        Headers.Builder()
+                            .add("Referer", "https://bunkr.cr/")
+                            .add("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+                            .build()
+                    )
+                    .build()
+            }
+
             Image(
-                painter = rememberAsyncImagePainter(
-                    ImageRequest.Builder(LocalContext.current)
-                        .data(fileInfo.thumbnailUrl)
-                        .crossfade(true)
-                        .placeholder(ColorDrawable(placeholderColor.hashCode()))
-                        .error(ColorDrawable(errorColor.hashCode()))
-                        .build()
-                ),
+                painter = rememberAsyncImagePainter(model = imageRequest),
                 contentDescription = fileInfo.fileName,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
