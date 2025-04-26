@@ -1,5 +1,6 @@
 package com.d3intran.nitpicker.screen.player
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.util.Log
 import android.view.View
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -27,10 +29,14 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
+import android.graphics.Color as AndroidColor // Import Android Graphics Color
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+@androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
@@ -53,6 +59,42 @@ fun PlayerScreen(
         Log.d("PlayerLifecycle", "Creating ExoPlayer instance")
         ExoPlayer.Builder(context).build()
     }
+
+    // --- Add DisposableEffect for System Bar Transparency ---
+    DisposableEffect(window, windowInsetsController) {
+        if (window == null || windowInsetsController == null) {
+            return@DisposableEffect onDispose {}
+        }
+
+        // Store original colors/flags to restore later (optional but good practice)
+        val originalStatusBarColor = window.statusBarColor
+        val originalNavBarColor = window.navigationBarColor
+        val wasLightStatusBars = windowInsetsController.isAppearanceLightStatusBars
+        val wasLightNavBars = windowInsetsController.isAppearanceLightNavigationBars
+
+        // Make system bars transparent
+        window.statusBarColor = Color.Transparent.toArgb()
+        window.navigationBarColor = Color.Transparent.toArgb() // Also make nav bar transparent
+
+        // Set system bar icons to light (assuming video content is generally dark)
+        windowInsetsController.isAppearanceLightStatusBars = false
+        windowInsetsController.isAppearanceLightNavigationBars = false // Adjust if nav bar area is light
+
+        Log.d("SystemUI", "Set system bars to transparent, icons to light.")
+
+        onDispose {
+            // Restore original settings when leaving the screen (optional)
+            // window.statusBarColor = originalStatusBarColor
+            // window.navigationBarColor = originalNavBarColor
+            // windowInsetsController.isAppearanceLightStatusBars = wasLightStatusBars
+            // windowInsetsController.isAppearanceLightNavigationBars = wasLightNavBars
+            // Log.d("SystemUI", "Restored original system bar appearance.")
+            // Note: If other screens also manage system bars, explicit restoration might
+            // interfere. Often, just letting the next screen set its desired appearance is enough.
+        }
+    }
+    // --- End DisposableEffect ---
+
 
     LaunchedEffect(isControllerVisible, windowInsetsController) {
         if (windowInsetsController == null) return@LaunchedEffect
@@ -188,20 +230,19 @@ fun PlayerScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Black.copy(alpha = 0.5f),
-                        titleContentColor = Color.White,
+                        containerColor = Color.Transparent, // <-- 设置为完全透明
+                        titleContentColor = Color.White,      // 保持标题和图标颜色为白色以便在视频上可见
                         navigationIconContentColor = Color.White
                     )
                 )
             }
         },
         containerColor = Color.Black
-    ) { paddingValues ->
+    ) { _ ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
-                .padding(paddingValues),
+                .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
             val currentUiState = uiState
@@ -231,6 +272,11 @@ fun PlayerScreen(
                                         isControllerVisible = visibility == View.VISIBLE
                                     }
                                 )
+                                // --- Make Controller Background Transparent ---
+                                val controlView = findViewById<View>(androidx.media3.ui.R.id.exo_controller) // Find the controller view by ID
+                                controlView?.setBackgroundColor(AndroidColor.TRANSPARENT) // Set its background to transparent
+                                Log.d("PlayerView", "Controller background set to transparent in factory.")
+                                // --- End Transparency Modification ---
                             }
                         },
                         update = { playerView ->
@@ -242,6 +288,11 @@ fun PlayerScreen(
                                     isControllerVisible = visibility == View.VISIBLE
                                 }
                             )
+                            // --- Make Controller Background Transparent (Update) ---
+                            val controlView = playerView.findViewById<View>(androidx.media3.ui.R.id.exo_controller) // Find the controller view again
+                            controlView?.setBackgroundColor(AndroidColor.TRANSPARENT) // Ensure transparency on update
+                            Log.d("PlayerView", "Controller background set to transparent in update.")
+                            // --- End Transparency Modification ---
                         },
                         modifier = Modifier.fillMaxSize()
                     )

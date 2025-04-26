@@ -1,4 +1,3 @@
-import com.android.build.gradle.internal.utils.isKspPluginApplied
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,16 +15,16 @@ android {
         applicationId = "com.d3intran.nitpicker"
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true // 启用代码缩减 (R8)
-            isShrinkResources = true // 启用资源缩减
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

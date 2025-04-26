@@ -1,46 +1,50 @@
-package com.d3intran.nitpicker.screen.files // Corrected package name
+package com.d3intran.nitpicker.screen.files
 
+import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add // Import Add icon
-import androidx.compose.material.icons.filled.Folder // Icon for folders/ Import for menu icon (optional)
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource // Import stringResource
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp // Import for sp unit
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
-import androidx.compose.runtime.mutableStateOf // Add import
-import androidx.compose.runtime.remember // Add import
-import androidx.compose.runtime.rememberCoroutineScope // Add import
-import androidx.compose.runtime.setValue // Add import
-import kotlinx.coroutines.launch // Add import
-import java.net.URLEncoder // Import for encoding
-import androidx.compose.foundation.ExperimentalFoundationApi // Add for combinedClickable
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable // Add for combinedClickable
-import androidx.compose.material3.AlertDialog // Add for Dialog
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import java.net.URLEncoder
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon // Import Icon
-import androidx.compose.material3.IconButton // Import IconButton
-import androidx.compose.material3.OutlinedTextField // Add for TextField
-import androidx.compose.material3.TextButton // Add for Dialog buttons
-import androidx.compose.foundation.border // Add import for border
-import androidx.compose.material3.OutlinedTextFieldDefaults // Add import for TextField colors
-import com.d3intran.nitpicker.R // Import R
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.border
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import com.d3intran.nitpicker.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -74,6 +78,30 @@ fun FilesScreen(
     val errorLoadingFolders = stringResource(R.string.files_error_title)
     val noFoldersFound = stringResource(R.string.files_empty)
 
+    // --- Set System Bar Color for FilesScreen ---
+    val view = LocalView.current
+    val filesBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
+    DisposableEffect(view, filesBackgroundColor) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val originalStatusBarColor = window.statusBarColor
+            val controller = WindowCompat.getInsetsController(window, view)
+            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
+
+            window.statusBarColor = filesBackgroundColor.toArgb()
+            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
+
+            onDispose {
+                // Optional: Restore previous color/flags
+                // window.statusBarColor = originalStatusBarColor
+                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
+            }
+        } else {
+            onDispose { }
+        }
+    }
+    // --- End System Bar Color Setting ---
+
     // Log composition lifecycle
     DisposableEffect(Unit) {
         Log.d("CompositionLifecycle", "FilesScreen Composed")
@@ -85,6 +113,7 @@ fun FilesScreen(
     Log.d("FilesScreenState", "Recomposing FilesScreen. isLoading: ${uiState.isLoading}, error: ${uiState.error}, folders: ${uiState.folders.size}")
 
     Scaffold(
+        modifier = Modifier.statusBarsPadding(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.files_title)) },
@@ -141,13 +170,13 @@ fun FilesScreen(
                 )
             )
         },
-        containerColor = Color(0xFF121212) // Dark background
-    ) { paddingValues ->
+        containerColor = filesBackgroundColor // Use the defined color
+    ) { paddingValues -> // Use paddingValues provided by Scaffold for content below TopAppBar
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp) // Add horizontal padding like HomeView
+                .padding(paddingValues) // Apply Scaffold padding
+                .padding(horizontal = 16.dp)
         ) {
             // Main content area using Box and when, similar to HomeView
             Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {

@@ -1,5 +1,6 @@
 package com.d3intran.nitpicker.screen.local_album
 
+import android.app.Activity
 import android.graphics.drawable.ColorDrawable
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -39,14 +40,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
@@ -56,9 +60,9 @@ import com.d3intran.nitpicker.model.FileType
 import com.d3intran.nitpicker.model.LocalFileItem
 import com.d3intran.nitpicker.screen.files.FolderItem
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -97,6 +101,30 @@ fun LocalAlbumScreen(
     }
     Log.d("LocalAlbumScreenState", "Recomposing. isLoading: ${uiState.isLoading}, error: ${uiState.error}, files: ${uiState.files.size}")
 
+    // --- Set System Bar Color for LocalAlbumScreen ---
+    val view = LocalView.current
+    val localAlbumBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
+    DisposableEffect(view, localAlbumBackgroundColor) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val originalStatusBarColor = window.statusBarColor
+            val controller = WindowCompat.getInsetsController(window, view)
+            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
+
+            window.statusBarColor = localAlbumBackgroundColor.toArgb()
+            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
+
+            onDispose {
+                // Optional: Restore previous color/flags
+                // window.statusBarColor = originalStatusBarColor
+                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
+            }
+        } else {
+            onDispose { }
+        }
+    }
+    // --- End System Bar Color Setting ---
+
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val columnCount = remember(windowSizeClass) {
         val windowWidth = windowSizeClass.minWidthDp
@@ -117,6 +145,7 @@ fun LocalAlbumScreen(
     val emptyFolderText = stringResource(R.string.local_album_empty)
 
     Scaffold(
+        modifier = Modifier.statusBarsPadding(),
         topBar = {
             if (uiState.isSelectionModeActive) {
                 SelectionTopAppBar(
@@ -188,12 +217,12 @@ fun LocalAlbumScreen(
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = Color(0xFF121212)
-    ) { paddingValues ->
+        containerColor = localAlbumBackgroundColor
+    ) { paddingValues -> // Use paddingValues provided by Scaffold for content below TopAppBar
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues) // Apply Scaffold padding
                 .padding(horizontal = 8.dp)
         ) {
             Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {

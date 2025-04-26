@@ -1,5 +1,6 @@
 package com.d3intran.nitpicker.ui.screens
 
+import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,17 +18,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.core.view.WindowCompat
 import androidx.navigation.NavController
+import com.d3intran.nitpicker.R
 import com.d3intran.nitpicker.model.Album
 import com.d3intran.nitpicker.screen.home.HomeViewModel
-import com.d3intran.nitpicker.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,20 +56,47 @@ fun HomeScreen(
     val noResultsText = stringResource(R.string.home_no_results)
     val initialPromptText = stringResource(R.string.home_initial_prompt)
 
+    // --- Set System Bar Color for HomeScreen ---
+    val view = LocalView.current
+    val homeBackgroundColor = Color(0xFF121212) // HomeScreen's background color
+    DisposableEffect(view, homeBackgroundColor) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val originalStatusBarColor = window.statusBarColor
+            val controller = WindowCompat.getInsetsController(window, view)
+            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
+
+            window.statusBarColor = homeBackgroundColor.toArgb() // Set status bar color to match background
+            controller?.isAppearanceLightStatusBars = false // Assuming dark background, use light icons
+
+            onDispose {
+                // Optional: Restore previous color/flags if needed, or let next screen handle it
+                // window.statusBarColor = originalStatusBarColor
+                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
+            }
+        } else {
+            onDispose { }
+        }
+    }
+    // --- End System Bar Color Setting ---
+
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF121212)
+        color = homeBackgroundColor // Use the defined color
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .statusBarsPadding() // <-- Add padding for the status bar
+                .padding(horizontal = 16.dp), // Keep horizontal padding
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // --- Adjust Top Padding for the first Box ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp)
+                    // .padding(top = 16.dp, bottom = 8.dp) // Remove or reduce top padding here as statusBarsPadding handles it
+                    .padding(bottom = 8.dp) // Keep bottom padding if needed
             ) {
                 IconButton(
                     onClick = {
@@ -89,6 +120,7 @@ fun HomeScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
+            // --- End Adjustment ---
 
             Box(
                 modifier = Modifier

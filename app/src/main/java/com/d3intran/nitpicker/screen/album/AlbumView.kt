@@ -42,6 +42,9 @@ import com.d3intran.nitpicker.model.FileInfo
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +55,7 @@ import androidx.compose.runtime.getValue
 import kotlinx.coroutines.launch
 import android.util.Log
 import okhttp3.Headers
+import androidx.core.view.WindowCompat
 
 // Helper function to find Activity from Context safely
 private fun Context.findActivity(): Activity? = when (this) {
@@ -103,7 +107,32 @@ fun AlbumScreen(
     // Calculate filtered files once
     val filteredFiles = filterFiles(uiState.allFiles, uiState.currentFilter)
 
+    // --- Set System Bar Color for AlbumScreen ---
+    val view = LocalView.current
+    val albumBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
+    DisposableEffect(view, albumBackgroundColor) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val originalStatusBarColor = window.statusBarColor
+            val controller = WindowCompat.getInsetsController(window, view)
+            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
+
+            window.statusBarColor = albumBackgroundColor.toArgb()
+            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
+
+            onDispose {
+                // Optional: Restore previous color/flags
+                // window.statusBarColor = originalStatusBarColor
+                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
+            }
+        } else {
+            onDispose { }
+        }
+    }
+    // --- End System Bar Color Setting ---
+
     Scaffold(
+        modifier = Modifier.statusBarsPadding(), // <-- Add padding to Scaffold
         topBar = {
             TopAppBar(
                 title = {
@@ -208,12 +237,12 @@ fun AlbumScreen(
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = Color(0xFF121212)
-    ) { paddingValues ->
+        containerColor = albumBackgroundColor // Use the defined color
+    ) { paddingValues -> // Use paddingValues provided by Scaffold for content below TopAppBar
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues) // Apply Scaffold padding
                 .padding(horizontal = 8.dp)
         ) {
             FilterControls(

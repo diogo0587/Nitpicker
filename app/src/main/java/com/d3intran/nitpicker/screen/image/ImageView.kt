@@ -1,5 +1,6 @@
 package com.d3intran.nitpicker.screen.image
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.util.Log
 import androidx.activity.compose.BackHandler
@@ -16,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -36,6 +38,7 @@ import kotlinx.coroutines.flow.map
 import net.engawapg.lib.zoomable.rememberZoomState
 import net.engawapg.lib.zoomable.zoomable // Import the zoomable modifier
 
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ImageViewerScreen(
@@ -52,6 +55,38 @@ fun ImageViewerScreen(
     val windowInsetsController = remember(view, window) {
         window?.let { WindowCompat.getInsetsController(it, view) }
     }
+
+    // --- Set System Bar Transparency ---
+    DisposableEffect(window, windowInsetsController) {
+        if (window == null || windowInsetsController == null) {
+            return@DisposableEffect onDispose {}
+        }
+        // Store original colors/flags (optional)
+        val originalStatusBarColor = window.statusBarColor
+        val originalNavBarColor = window.navigationBarColor
+        val wasLightStatusBars = windowInsetsController.isAppearanceLightStatusBars
+        val wasLightNavBars = windowInsetsController.isAppearanceLightNavigationBars
+
+        // Make system bars transparent
+        window.statusBarColor = Color.Transparent.toArgb()
+        window.navigationBarColor = Color.Transparent.toArgb()
+
+        // Set system bar icons to light (assuming image background is generally dark)
+        windowInsetsController.isAppearanceLightStatusBars = false
+        windowInsetsController.isAppearanceLightNavigationBars = false
+
+        Log.d("SystemUI_ImageViewer", "Set system bars to transparent, icons to light.")
+
+        onDispose {
+            // Optional: Restore original settings when leaving the screen
+            // window.statusBarColor = originalStatusBarColor
+            // window.navigationBarColor = originalNavBarColor
+            // windowInsetsController.isAppearanceLightStatusBars = wasLightStatusBars
+            // windowInsetsController.isAppearanceLightNavigationBars = wasLightNavBars
+            // Log.d("SystemUI_ImageViewer", "Restored original system bar appearance.")
+        }
+    }
+    // --- End System Bar Transparency ---
 
     // Hide/Show System Bars based on controlsVisible state
     LaunchedEffect(controlsVisible, windowInsetsController) {
@@ -110,7 +145,7 @@ fun ImageViewerScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Black.copy(alpha = 0.5f),
+                        containerColor = Color.Transparent, // <-- Make TopAppBar transparent
                         titleContentColor = Color.White,
                         navigationIconContentColor = Color.White
                     )
@@ -118,12 +153,13 @@ fun ImageViewerScreen(
             }
         },
         containerColor = Color.Black
-    ) { paddingValues ->
+    ) { _ -> // <-- Ignore paddingValues by renaming to _
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
-                .padding(paddingValues), // Apply padding from Scaffold
+                .background(Color.Black),
+                // --- REMOVE padding modifier ---
+                // .padding(paddingValues), // <-- REMOVE THIS LINE
             contentAlignment = Alignment.Center
         ) {
             when {

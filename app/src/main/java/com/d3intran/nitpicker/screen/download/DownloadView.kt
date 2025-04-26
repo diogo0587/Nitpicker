@@ -1,5 +1,6 @@
 package com.d3intran.nitpicker.screen.download
 
+import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,11 +28,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import kotlinx.coroutines.launch
@@ -60,6 +64,30 @@ fun DownloadScreen(
 
     val emptyText = stringResource(R.string.download_empty)
 
+    // --- Set System Bar Color for DownloadScreen ---
+    val view = LocalView.current
+    val downloadBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
+    DisposableEffect(view, downloadBackgroundColor) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val originalStatusBarColor = window.statusBarColor
+            val controller = WindowCompat.getInsetsController(window, view)
+            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
+
+            window.statusBarColor = downloadBackgroundColor.toArgb()
+            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
+
+            onDispose {
+                // Optional: Restore previous color/flags
+                // window.statusBarColor = originalStatusBarColor
+                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
+            }
+        } else {
+            onDispose { }
+        }
+    }
+    // --- End System Bar Color Setting ---
+
     DisposableEffect(Unit) {
         Log.d("CompositionLifecycle", "DownloadScreen Composed")
         onDispose {
@@ -68,6 +96,7 @@ fun DownloadScreen(
     }
 
     Scaffold(
+        modifier = Modifier.statusBarsPadding(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.download_title)) },
@@ -112,7 +141,7 @@ fun DownloadScreen(
                 )
             )
         },
-        containerColor = Color(0xFF121212)
+        containerColor = downloadBackgroundColor
     ) { paddingValues ->
         if (downloads.isEmpty()) {
             Box(

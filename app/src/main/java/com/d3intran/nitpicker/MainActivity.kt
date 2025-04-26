@@ -23,7 +23,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat // <-- Import WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -31,7 +33,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.d3intran.nitpicker.screen.album.AlbumScreen
 import com.d3intran.nitpicker.screen.download.DownloadScreen
 import com.d3intran.nitpicker.screen.home.HomeViewModel
@@ -50,10 +51,13 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         // Handle the splash screen transition.
-        // Must be called before super.onCreate()
         installSplashScreen()
 
         super.onCreate(savedInstanceState)
+
+        // --- Add this line for edge-to-edge display ---
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        // --- End edge-to-edge configuration ---
 
         setContent {
             NitpickerTheme {
@@ -220,8 +224,10 @@ class MainActivity : ComponentActivity() {
                                     navArgument("initialIndex") { type = NavType.IntType }
                                 )
                             ) { backStackEntry ->
+                                // PlayerScreen will now draw under the status bar
                                 PlayerScreen(navController = navController)
                             }
+
                             composable(
                                 route = "image_viewer_screen/{folderPath}/{initialIndex}",
                                 arguments = listOf(
