@@ -42,9 +42,9 @@ import com.d3intran.nitpicker.model.FileInfo
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.layout.WindowInsets // Import WindowInsets
+import androidx.compose.foundation.layout.statusBars // Import statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding // Import windowInsetsPadding
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.mutableStateOf
@@ -107,34 +107,10 @@ fun AlbumScreen(
     // Calculate filtered files once
     val filteredFiles = filterFiles(uiState.allFiles, uiState.currentFilter)
 
-    // --- Set System Bar Color for AlbumScreen ---
-    val view = LocalView.current
-    val albumBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
-    DisposableEffect(view, albumBackgroundColor) {
-        val window = (view.context as? Activity)?.window
-        if (window != null) {
-            val originalStatusBarColor = window.statusBarColor
-            val controller = WindowCompat.getInsetsController(window, view)
-            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
-
-            window.statusBarColor = albumBackgroundColor.toArgb()
-            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
-
-            onDispose {
-                // Optional: Restore previous color/flags
-                // window.statusBarColor = originalStatusBarColor
-                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
-            }
-        } else {
-            onDispose { }
-        }
-    }
-    // --- End System Bar Color Setting ---
-
     Scaffold(
-        modifier = Modifier.statusBarsPadding(), // <-- Add padding to Scaffold
         topBar = {
             TopAppBar(
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
                 title = {
                     Text(
                         text = uiState.albumTitle,
@@ -229,7 +205,7 @@ fun AlbumScreen(
                     // --- End Download Button ---
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF1E1E1E),
+                    containerColor = Color(0xFF1E1E1E), // Matches status bar color
                     titleContentColor = Color.White,
                     navigationIconContentColor = Color.White,
                     actionIconContentColor = Color.White
@@ -237,8 +213,8 @@ fun AlbumScreen(
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = albumBackgroundColor // Use the defined color
-    ) { paddingValues -> // Use paddingValues provided by Scaffold for content below TopAppBar
+        containerColor = Color(0xFF121212) // Main background color
+    ) { paddingValues -> // Use paddingValues provided by Scaffold
         Column(
             modifier = Modifier
                 .fillMaxSize()

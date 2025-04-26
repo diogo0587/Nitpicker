@@ -42,6 +42,9 @@ import kotlinx.coroutines.launch
 import com.d3intran.nitpicker.R
 import com.d3intran.nitpicker.model.DownloadProgress
 import com.d3intran.nitpicker.model.DownloadStatus
+import androidx.compose.foundation.layout.WindowInsets // Import WindowInsets
+import androidx.compose.foundation.layout.statusBars // Import statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding // Import windowInsetsPadding
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,30 +67,6 @@ fun DownloadScreen(
 
     val emptyText = stringResource(R.string.download_empty)
 
-    // --- Set System Bar Color for DownloadScreen ---
-    val view = LocalView.current
-    val downloadBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
-    DisposableEffect(view, downloadBackgroundColor) {
-        val window = (view.context as? Activity)?.window
-        if (window != null) {
-            val originalStatusBarColor = window.statusBarColor
-            val controller = WindowCompat.getInsetsController(window, view)
-            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
-
-            window.statusBarColor = downloadBackgroundColor.toArgb()
-            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
-
-            onDispose {
-                // Optional: Restore previous color/flags
-                // window.statusBarColor = originalStatusBarColor
-                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
-            }
-        } else {
-            onDispose { }
-        }
-    }
-    // --- End System Bar Color Setting ---
-
     DisposableEffect(Unit) {
         Log.d("CompositionLifecycle", "DownloadScreen Composed")
         onDispose {
@@ -96,9 +75,9 @@ fun DownloadScreen(
     }
 
     Scaffold(
-        modifier = Modifier.statusBarsPadding(),
         topBar = {
             TopAppBar(
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
                 title = { Text(stringResource(R.string.download_title)) },
                 navigationIcon = {
                     IconButton(
@@ -135,17 +114,18 @@ fun DownloadScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF1E1E1E),
+                    containerColor = Color(0xFF1E1E1E), // This color now matches the status bar color
                     titleContentColor = Color.White,
                     navigationIconContentColor = Color.White
                 )
             )
         },
-        containerColor = downloadBackgroundColor
-    ) { paddingValues ->
+        containerColor = Color(0xFF121212) // Main background color
+    ) { paddingValues -> // Use paddingValues provided by Scaffold
+        // Apply paddingValues to the content below the TopAppBar
         if (downloads.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
+                modifier = Modifier.fillMaxSize().padding(paddingValues), // Apply Scaffold padding
                 contentAlignment = Alignment.Center
             ) {
                 Text(emptyText, color = Color(0xFFAAAAAA))
@@ -154,7 +134,7 @@ fun DownloadScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues), // Apply Scaffold padding
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {

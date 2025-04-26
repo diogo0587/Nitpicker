@@ -45,6 +45,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.foundation.border
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import com.d3intran.nitpicker.R
+import androidx.compose.foundation.layout.WindowInsets // Import WindowInsets
+import androidx.compose.foundation.layout.statusBars // Import statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding // Import windowInsetsPadding
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -78,29 +81,12 @@ fun FilesScreen(
     val errorLoadingFolders = stringResource(R.string.files_error_title)
     val noFoldersFound = stringResource(R.string.files_empty)
 
-    // --- Set System Bar Color for FilesScreen ---
+    // --- REMOVE DisposableEffect for System Bar Color ---
+    /*
     val view = LocalView.current
-    val filesBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
-    DisposableEffect(view, filesBackgroundColor) {
-        val window = (view.context as? Activity)?.window
-        if (window != null) {
-            val originalStatusBarColor = window.statusBarColor
-            val controller = WindowCompat.getInsetsController(window, view)
-            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
-
-            window.statusBarColor = filesBackgroundColor.toArgb()
-            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
-
-            onDispose {
-                // Optional: Restore previous color/flags
-                // window.statusBarColor = originalStatusBarColor
-                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
-            }
-        } else {
-            onDispose { }
-        }
-    }
-    // --- End System Bar Color Setting ---
+    val filesBackgroundColor = Color(0xFF121212)
+    DisposableEffect(view, filesBackgroundColor) { ... }
+    */
 
     // Log composition lifecycle
     DisposableEffect(Unit) {
@@ -113,9 +99,10 @@ fun FilesScreen(
     Log.d("FilesScreenState", "Recomposing FilesScreen. isLoading: ${uiState.isLoading}, error: ${uiState.error}, folders: ${uiState.folders.size}")
 
     Scaffold(
-        modifier = Modifier.statusBarsPadding(),
         topBar = {
             TopAppBar(
+                // --- ADD windowInsetsPadding to TopAppBar ---
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
                 title = { Text(stringResource(R.string.files_title)) },
                 navigationIcon = {
                     IconButton(
@@ -163,22 +150,21 @@ fun FilesScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF1E1E1E),
+                    containerColor = Color(0xFF1E1E1E), // Matches status bar color
                     titleContentColor = Color.White,
                     navigationIconContentColor = Color.White,
                     actionIconContentColor = Color.White // Ensure action icons are white
                 )
             )
         },
-        containerColor = filesBackgroundColor // Use the defined color
-    ) { paddingValues -> // Use paddingValues provided by Scaffold for content below TopAppBar
+        containerColor = Color(0xFF121212) // Main background color
+    ) { paddingValues -> // Use paddingValues provided by Scaffold
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues) // Apply Scaffold padding
                 .padding(horizontal = 16.dp)
         ) {
-            // Main content area using Box and when, similar to HomeView
             Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
                 when {
                     uiState.isLoading -> {

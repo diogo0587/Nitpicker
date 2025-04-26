@@ -93,37 +93,7 @@ fun LocalAlbumScreen(
         }
     }
 
-    DisposableEffect(Unit) {
-        Log.d("CompositionLifecycle", "LocalAlbumScreen Composed for path: ${uiState.folderPath}")
-        onDispose {
-            Log.d("CompositionLifecycle", "LocalAlbumScreen Disposed for path: ${uiState.folderPath}")
-        }
-    }
     Log.d("LocalAlbumScreenState", "Recomposing. isLoading: ${uiState.isLoading}, error: ${uiState.error}, files: ${uiState.files.size}")
-
-    // --- Set System Bar Color for LocalAlbumScreen ---
-    val view = LocalView.current
-    val localAlbumBackgroundColor = Color(0xFF121212) // Match Scaffold containerColor
-    DisposableEffect(view, localAlbumBackgroundColor) {
-        val window = (view.context as? Activity)?.window
-        if (window != null) {
-            val originalStatusBarColor = window.statusBarColor
-            val controller = WindowCompat.getInsetsController(window, view)
-            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
-
-            window.statusBarColor = localAlbumBackgroundColor.toArgb()
-            controller?.isAppearanceLightStatusBars = false // Dark background -> light icons
-
-            onDispose {
-                // Optional: Restore previous color/flags
-                // window.statusBarColor = originalStatusBarColor
-                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
-            }
-        } else {
-            onDispose { }
-        }
-    }
-    // --- End System Bar Color Setting ---
 
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val columnCount = remember(windowSizeClass) {
@@ -145,10 +115,10 @@ fun LocalAlbumScreen(
     val emptyFolderText = stringResource(R.string.local_album_empty)
 
     Scaffold(
-        modifier = Modifier.statusBarsPadding(),
         topBar = {
             if (uiState.isSelectionModeActive) {
                 SelectionTopAppBar(
+                    modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
                     selectedCount = uiState.selectedFileCount,
                     onCancelClick = {
                         Log.d("SelectionTopAppBar", "Cancel clicked, exiting selection.")
@@ -174,6 +144,7 @@ fun LocalAlbumScreen(
                 )
             } else {
                 TopAppBar(
+                    modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
                     title = {
                         Text(
                             text = uiState.folderName.ifEmpty { defaultTitle },
@@ -208,7 +179,7 @@ fun LocalAlbumScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(0xFF1E1E1E),
+                        containerColor = Color(0xFF1E1E1E), // Matches status bar color
                         titleContentColor = Color.White,
                         navigationIconContentColor = Color.White,
                         actionIconContentColor = Color.White
@@ -217,8 +188,8 @@ fun LocalAlbumScreen(
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        containerColor = localAlbumBackgroundColor
-    ) { paddingValues -> // Use paddingValues provided by Scaffold for content below TopAppBar
+        containerColor = Color(0xFF121212) // Main background color
+    ) { paddingValues -> // Use paddingValues provided by Scaffold
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -345,6 +316,7 @@ fun LocalAlbumScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SelectionTopAppBar(
+    modifier: Modifier = Modifier,
     selectedCount: Int,
     onCancelClick: () -> Unit,
     onActionMenuClick: () -> Unit,
@@ -355,6 +327,7 @@ fun SelectionTopAppBar(
     onDeleteClick: () -> Unit
 ) {
     TopAppBar(
+        modifier = modifier,
         title = { Text(stringResource(R.string.selected_count, selectedCount)) },
         navigationIcon = {
             IconButton(onClick = onCancelClick) {
@@ -392,7 +365,7 @@ fun SelectionTopAppBar(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color(0xFF1E1E1E),
+            containerColor = Color(0xFF1E1E1E), // Matches status bar color
             titleContentColor = Color.White,
             navigationIconContentColor = Color.White,
             actionIconContentColor = Color.White

@@ -4,12 +4,11 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.* // Import layout package for WindowInsets
+import androidx.compose.foundation.layout.WindowInsets // Import WindowInsets
+import androidx.compose.foundation.layout.statusBars // Import statusBars
+import androidx.compose.foundation.layout.navigationBars // Import navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding // Import windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
@@ -18,12 +17,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb // Import toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.core.view.WindowCompat // <-- Import WindowCompat
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -50,56 +50,70 @@ import kotlinx.coroutines.CoroutineScope
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Handle the splash screen transition.
         installSplashScreen()
-
         super.onCreate(savedInstanceState)
 
-        // --- Add this line for edge-to-edge display ---
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        // --- End edge-to-edge configuration ---
 
         setContent {
             NitpickerTheme {
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
-
-                // Shared state for navigation debounce
                 var lastNavTime by remember { mutableStateOf(0L) }
-                val debounceDelay = 500L // 防抖延迟 (毫秒), 可调整
-
-                // Add listener for navigation changes
-                LaunchedEffect(navController) {
-                    navController.addOnDestinationChangedListener { controller, destination, arguments ->
-                        Log.d("NavigationFlow", "Navigated to: ${destination.route}")
-                    }
-                }
+                val debounceDelay = 500L
 
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
-                // Log route and drawer state on recomposition
-                Log.d("NavigationFlow", "Recomposed - Route: $currentRoute, Drawer: ${drawerState.currentValue}")
 
-                // Determine if the drawer gesture should be enabled
-                // Disable drawer gesture if the current route starts with "player_screen/"
-                val gesturesEnabled = currentRoute?.startsWith("player_screen/") != true
-                Log.d("NavigationFlow", "Gestures Enabled: $gesturesEnabled for route: $currentRoute")
+                val isImmersive = currentRoute?.startsWith("player_screen/") == true ||
+                                  currentRoute?.startsWith("image_viewer_screen/") == true
 
+                // --- Centralized System Bar Appearance Management ---
+                LaunchedEffect(currentRoute, window) {
+                    val controller = WindowCompat.getInsetsController(window, window.decorView)
+                    val homeBackgroundColor = Color(0xFF121212) // Define home background color
+                    val defaultTopAppBarColor = Color(0xFF1E1E1E) // Define default TopAppBar color
+                    val defaultBackgroundColor = Color(0xFF121212) // Define default background color
+
+                    if (isImmersive) {
+                        // Immersive screens: Transparent bars, light icons
+                        window.statusBarColor = Color.Transparent.toArgb()
+                        window.navigationBarColor = Color.Transparent.toArgb()
+                        controller?.isAppearanceLightStatusBars = false
+                        controller?.isAppearanceLightNavigationBars = false
+                        Log.d("SystemUI_Main", "Route '$currentRoute' is immersive. Setting transparent bars.")
+                    } else {
+                        // Non-immersive screens:
+                        // Set status bar color based on the route
+                        val statusBarColor = if (currentRoute == "home_screen") {
+                            homeBackgroundColor // Use home background for HomeScreen status bar
+                        } else {
+                            defaultTopAppBarColor // Use default TopAppBar color for others
+                        }
+                        window.statusBarColor = statusBarColor.toArgb()
+
+                        // Set navigation bar color (using default background)
+                        window.navigationBarColor = defaultBackgroundColor.toArgb()
+
+                        // Set icon appearance (assuming dark backgrounds need light icons)
+                        controller?.isAppearanceLightStatusBars = false
+                        controller?.isAppearanceLightNavigationBars = false
+                        Log.d("SystemUI_Main", "Route '$currentRoute' is NOT immersive. Setting status bar to ${statusBarColor}, nav bar to ${defaultBackgroundColor}.")
+                    }
+                }
+                // --- End Centralized Management ---
+
+                val gesturesEnabled = !isImmersive
 
                 val configuration = LocalConfiguration.current
                 val screenWidthDp = configuration.screenWidthDp.dp
                 val screenHeightDp = configuration.screenHeightDp.dp
-
-                val drawerWidth = if (screenWidthDp > screenHeightDp) {
-                    screenWidthDp * 0.5f
-                } else {
-                    screenWidthDp * 0.7f
-                }
+                val drawerWidth = if (screenWidthDp > screenHeightDp) screenWidthDp * 0.5f else screenWidthDp * 0.7f
 
                 ModalNavigationDrawer(
                     drawerState = drawerState,
-                    gesturesEnabled = gesturesEnabled, // Use the calculated value
+                    gesturesEnabled = gesturesEnabled,
                     drawerContent = {
                         ModalDrawerSheet(
                             modifier = Modifier
@@ -108,6 +122,7 @@ class MainActivity : ComponentActivity() {
                             drawerContainerColor = Color(0xFF1E1E1E)
                         ) {
                             Spacer(Modifier.height(12.dp))
+                            // --- Drawer Items ---
                             DrawerItem(
                                 label = stringResource(id = R.string.drawer_home),
                                 icon = Icons.Filled.Home,
@@ -172,26 +187,26 @@ class MainActivity : ComponentActivity() {
                     }
                 ) {
                     Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
+                        modifier = Modifier
+                            .fillMaxSize()
+                            // Apply navigation bar padding here if needed globally,
+                            // or handle it within each screen's Scaffold content padding
+                            .navigationBarsPadding(), // Apply nav bar padding to push content up
+                        color = MaterialTheme.colorScheme.background // Use theme background
                     ) {
                         NavHost(navController = navController, startDestination = "home_screen") {
+                            // --- Screen composables ---
+                            // Ensure these composables DO NOT apply statusBarsPadding() themselves globally
+                            // but DO apply it to their TopAppBar
                             composable("home_screen") {
-                                val homeViewModel: HomeViewModel = hiltViewModel()
                                 HomeScreen(
+                                    homeViewModel = hiltViewModel(),
                                     navController = navController,
-                                    homeViewModel = homeViewModel,
-                                    openDrawer = {
-                                        scope.launch {
-                                            try {
-                                                drawerState.open()
-                                            } catch (e: Exception) {
-                                                Log.e("DrawerAction", "Error opening drawer", e)
-                                            }
-                                        }
-                                    }
+                                    openDrawer = { scope.launch { drawerState.open() } }
                                 )
                             }
+                            composable("download_screen") { DownloadScreen(navController = navController) }
+                            composable("files_screen") { FilesScreen(navController = navController) }
                             composable(
                                 route = "album_screen/{albumUrl}/{albumTitle}",
                                 arguments = listOf(
@@ -199,15 +214,7 @@ class MainActivity : ComponentActivity() {
                                     navArgument("albumTitle") { type = NavType.StringType }
                                 )
                             ) { backStackEntry ->
-                                val albumUrl = backStackEntry.arguments?.getString("albumUrl")?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: ""
-                                val albumTitle = backStackEntry.arguments?.getString("albumTitle")?.let { java.net.URLDecoder.decode(it, "UTF-8") } ?: ""
                                 AlbumScreen(navController = navController)
-                            }
-                            composable("download_screen") {
-                                DownloadScreen(navController = navController)
-                            }
-                            composable("files_screen") {
-                                FilesScreen(navController = navController)
                             }
                             composable(
                                 route = "local_album_screen/{folderPath}",
@@ -224,7 +231,6 @@ class MainActivity : ComponentActivity() {
                                     navArgument("initialIndex") { type = NavType.IntType }
                                 )
                             ) { backStackEntry ->
-                                // PlayerScreen will now draw under the status bar
                                 PlayerScreen(navController = navController)
                             }
 
@@ -245,6 +251,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// --- DrawerItem Composable (ensure it's updated as before) ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DrawerItem(
@@ -254,7 +261,7 @@ fun DrawerItem(
     currentRoute: String?,
     navController: NavHostController,
     closeDrawer: () -> Unit,
-    scope: CoroutineScope, // <-- 确保参数已添加
+    scope: CoroutineScope,
     navigateOnClick: Boolean = true,
     // Debounce parameters
     lastNavTime: Long,

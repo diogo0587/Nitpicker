@@ -57,28 +57,9 @@ fun HomeScreen(
     val initialPromptText = stringResource(R.string.home_initial_prompt)
 
     // --- Set System Bar Color for HomeScreen ---
-    val view = LocalView.current
+    // val view = LocalView.current  // <-- REMOVE or COMMENT OUT
     val homeBackgroundColor = Color(0xFF121212) // HomeScreen's background color
-    DisposableEffect(view, homeBackgroundColor) {
-        val window = (view.context as? Activity)?.window
-        if (window != null) {
-            val originalStatusBarColor = window.statusBarColor
-            val controller = WindowCompat.getInsetsController(window, view)
-            val wasLightStatusBars = controller?.isAppearanceLightStatusBars ?: false
-
-            window.statusBarColor = homeBackgroundColor.toArgb() // Set status bar color to match background
-            controller?.isAppearanceLightStatusBars = false // Assuming dark background, use light icons
-
-            onDispose {
-                // Optional: Restore previous color/flags if needed, or let next screen handle it
-                // window.statusBarColor = originalStatusBarColor
-                // controller?.isAppearanceLightStatusBars = wasLightStatusBars
-            }
-        } else {
-            onDispose { }
-        }
-    }
-    // --- End System Bar Color Setting ---
+    // You might have had a DisposableEffect here previously to set the color, remove that too if present.
 
     Surface(
         modifier = Modifier.fillMaxSize(),
