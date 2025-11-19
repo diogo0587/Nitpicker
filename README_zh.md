@@ -29,21 +29,6 @@
 3.  在你的 Android 设备上，你可能需要允许“安装来自未知来源的应用”才能安装该 APK。
 4.  找到下载的 APK 文件并点击安装。
 
-## 🛠️ 从源码构建
-
-如果你想自行构建此应用：
-
-1.  **克隆仓库:**
-    ```bash
-    git clone https://github.com/d3intran/Nitpicker
-    cd Nitpicker
-    ```
-2.  **打开项目:** 使用最新稳定版的 Android Studio 打开项目。
-3.  **同步 Gradle:** 等待 Android Studio 完成 Gradle 同步和依赖下载。
-4.  **构建 APK:**
-    *   (可选) 如果你想构建 Release 版本，请确保你已按照 [Android 签名文档](https://developer.android.com/studio/publish/app-signing#sign-apk) 配置好了签名密钥。将密钥信息配置在 `local.properties` 或环境变量中，并修改 `app/build.gradle` 中的 `signingConfigs`。
-    *   在 Android Studio 菜单中选择 `Build` > `Build Bundle(s) / APK(s)` > `Build APK(s)`。
-    *   生成的 APK 文件将位于 `app/release/apk/` 目录下
 
 ## 🤝 贡献 
 
