@@ -27,21 +27,6 @@ You can download the latest `app-release.apk` file directly from the **[GitHub R
 3.  On your Android device, you might need to enable "Install from unknown sources" to install the APK.
 4.  Locate the downloaded APK file and tap to install.
 
-## 🛠️ Building from Source
-
-If you want to build this application yourself:
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/d3intran/Nitpicker.git
-    cd Nitpicker
-    ```
-2.  **Open the project:** Use the latest stable version of Android Studio to open the project.
-3.  **Sync Gradle:** Wait for Android Studio to complete Gradle sync and download dependencies.
-4.  **Build APK:**
-    *   (Optional) To build a Release version, ensure you have configured signing keys according to the [Android Signing documentation](https://developer.android.com/studio/publish/app-signing#sign-apk). Configure key information in `local.properties` or environment variables and modify `signingConfigs` in `app/build.gradle`.
-    *   In the Android Studio menu, select `Build` > `Build Bundle(s) / APK(s)` > `Build APK(s)`.
-    *   The generated APK file will be located in the `app/build/outputs/apk/release/` directory. <!-- Corrected standard output path -->
 
 ## 🤝 Contributing
 
