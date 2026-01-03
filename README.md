@@ -2,7 +2,7 @@
 
 [中文](README_zh.md) | **English**
 
-**Nitpicker is an Android application for browsing, viewing, and downloading images and videos from [bunkr-albums](https://bunkr-albums.io).   (onlyfans/fantia/fansly...)**
+**Nitpicker is an Android application for browsing, viewing, and downloading images and videos from a website**
 
 ## 📄 Disclaimer
   * This software is intended solely for learning and exchanging knowledge about Android APIs. It does not store any file information. All content originates from the internet, and the author is not responsible for any of the content.
