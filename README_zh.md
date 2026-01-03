@@ -3,7 +3,7 @@
 **中文** | [English](README.md)
 
 
-**Nitpicker 是一款 Android 应用程序，用于浏览、查看和下载来自 [bunkr-albums](https://bunkr-albums.io) 的图片和视频。(onlyfans/fantia/fansly...)**
+**Nitpicker 是一款 Android 应用程序，用于浏览、查看和下载来自网站的视频**
 
 ## 📄免责声明
   * 此软件仅供学习交流安卓api，不参与存储任何文件信息，一切内容来源于网络，作者不对其中任何内容负责
