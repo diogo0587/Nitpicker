@@ -1,4 +1,4 @@
-# Nitpicker 🖼️🎬
+# Nitpicker 🖼️🎬(vibe coding by Gemini 2.5 pro)
 
 [中文](README_zh.md) | **English**
 
