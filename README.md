@@ -18,6 +18,13 @@
 *   Built-in video player with playlist support and state saving
 *   Built-in image viewer with gesture zoom/pan and swipe navigation
 
+This app was developed based on [bunkr-albums.io](https://bunkr-albums.io). Because of potential copyright risks, I didn't make the downloaded content appear directly in the phone's gallery. However, the app's directory:
+
+`Android/data/com.d3intran.nitpicker/files/Download/`
+
+contains all the downloaded videos. 
+Inside the app, you can **long-press** folders to rename them, or create/delete folders to manage videos. You can also enter a folder to select videos and move them elsewhere.
+
 ## 🚀 Installation
 
 You can download the latest `app-release.apk` file directly from the **[GitHub Releases](https://github.com/d3intran/Nitpicker/releases)** page.
