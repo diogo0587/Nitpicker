@@ -25,29 +25,52 @@ jobs:
         gradle-version: wrapper
         cache-read-only: false 
 
-    - name: Patch Download Logic and Permissions
+    - name: Patch Files with Python
       run: |
-        echo "Aplicando correções de código..."
-        
-        # 1. Ajuste da lógica de pasta nos arquivos Kotlin
-        FILES=$(grep -lR "getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)" app/src/main/java || true)
-        if [ -n "$FILES" ]; then
-          for FILE in $FILES; do
-            echo "Corrigindo pasta em: $FILE"
-            sed -i 's/getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)/File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nit")/g' "$FILE"
-            grep -q "import java.io.File" "$FILE" || sed -i '/^package /a \import android.os.Environment\nimport java.io.File' "$FILE"
-          done
-        fi
-        
-        # 2. Ajuste do Manifesto
-        MANIFEST="app/src/main/AndroidManifest.xml"
-        grep -q "WRITE_EXTERNAL_STORAGE" $MANIFEST || sed -i '/<application/i <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST
-        grep -q "READ_EXTERNAL_STORAGE" $MANIFEST || sed -i '/<application/i <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' $MANIFEST
-        if ! grep -q "requestLegacyExternalStorage" $MANIFEST; then
-           sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' $MANIFEST
-        fi
+        python3 -c '
+        import os, re
 
-    # ESTA É A LINHA QUE ESTAVA FALTANDO:
+        def patch_file(filepath):
+            with open(filepath, "r") as f:
+                content = f.read()
+            
+            # 1. Substitui a lógica de diretório (mais abrangente)
+            pattern = r"getExternalFilesDir\s*\(\s*Environment\.DIRECTORY_DOWNLOADS\s*\)"
+            replacement = "File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), \"Nit\")"
+            
+            if "getExternalFilesDir" in content:
+                new_content = re.sub(pattern, replacement, content)
+                
+                # 2. Garante os imports logo após o package
+                if "import java.io.File" not in new_content:
+                    import_str = "\nimport android.os.Environment\nimport java.io.File"
+                    if "package " in new_content:
+                        new_content = re.sub(r"(package .*\n)", r"\1" + import_str, new_content)
+                    else:
+                        new_content = import_str + "\n" + new_content
+                
+                with open(filepath, "w") as f:
+                    f.write(new_content)
+                print(f"Patched: {filepath}")
+
+        # Varre a pasta do código fonte
+        for root, dirs, files in os.walk("app/src/main/java"):
+            for file in files:
+                if file.endswith(".kt"):
+                    patch_file(os.path.join(root, file))
+        '
+
+    - name: Fix AndroidManifest
+      run: |
+        MANIFEST="app/src/main/AndroidManifest.xml"
+        # Adiciona requestLegacyExternalStorage se não existir
+        if ! grep -q "requestLegacyExternalStorage" $MANIFEST; then
+          sed -i "s/<application/<application android:requestLegacyExternalStorage=\"true\"/g" $MANIFEST
+        fi
+        # Garante as permissões (sem duplicar)
+        grep -q "WRITE_EXTERNAL_STORAGE" $MANIFEST || sed -i "/<application/i <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />" $MANIFEST
+        grep -q "READ_EXTERNAL_STORAGE" $MANIFEST || sed -i "/<application/i <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />" $MANIFEST
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
@@ -57,10 +80,10 @@ jobs:
           --parallel \
           --build-cache \
           -Dorg.gradle.jvmargs="-Xmx4g -Dfile.encoding=UTF-8" \
-          -Dorg.gradle.configuration-cache=true
-          
+          -Dorg.gradle.configuration-cache=false
+
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Nitpicker-Final-APK
+        name: Nitpicker-Fixed-APK
         path: app/build/outputs/apk/debug/app-debug.apk
