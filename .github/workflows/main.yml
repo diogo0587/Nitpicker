@@ -1,4 +1,4 @@
-name: Build Nitpicker APK (Fixed)
+name: Build Nitpicker APK
 
 on:
   push:
@@ -35,23 +35,21 @@ jobs:
           for FILE in $FILES; do
             echo "Corrigindo pasta em: $FILE"
             sed -i 's/getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)/File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nit")/g' "$FILE"
-            # Adiciona imports logo após o package (apenas se não existirem)
             grep -q "import java.io.File" "$FILE" || sed -i '/^package /a \import android.os.Environment\nimport java.io.File' "$FILE"
           done
         fi
         
-        # 2. Ajuste do Manifesto (Sem duplicar permissões)
+        # 2. Ajuste do Manifesto
         MANIFEST="app/src/main/AndroidManifest.xml"
-        echo "Ajustando AndroidManifest.xml..."
-        
-        # Só adiciona se não existir
         grep -q "WRITE_EXTERNAL_STORAGE" $MANIFEST || sed -i '/<application/i <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST
         grep -q "READ_EXTERNAL_STORAGE" $MANIFEST || sed -i '/<application/i <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' $MANIFEST
-        
-        # Adiciona requestLegacyExternalStorage se não estiver lá
         if ! grep -q "requestLegacyExternalStorage" $MANIFEST; then
            sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' $MANIFEST
         fi
+
+    # ESTA É A LINHA QUE ESTAVA FALTANDO:
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
 
     - name: Build with Gradle
       run: |
