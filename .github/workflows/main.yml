@@ -1,4 +1,4 @@
-name: Build Nitpicker APK
+name: Build Nitpicker APK (Fixed)
 
 on:
   push:
@@ -18,49 +18,51 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: wrapper
+        cache-read-only: false 
 
     - name: Patch Download Logic and Permissions
       run: |
-        echo "Iniciando correções de código..."
+        echo "Aplicando correções de código..."
         
-        # 1. Localiza apenas arquivos que usam getExternalFilesDir e aplica a mudança
-        # Isso evita injetar lixo em arquivos que não tem nada a ver com download
+        # 1. Ajuste da lógica de pasta nos arquivos Kotlin
         FILES=$(grep -lR "getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)" app/src/main/java || true)
-        
-        if [ -z "$FILES" ]; then
-          echo "Nenhum arquivo encontrado com o padrão de download antigo."
-        else
+        if [ -n "$FILES" ]; then
           for FILE in $FILES; do
-            echo "Corrigindo $FILE..."
-            # Substitui o caminho para Download/Nit
+            echo "Corrigindo pasta em: $FILE"
             sed -i 's/getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)/File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nit")/g' "$FILE"
-            
-            # Insere os imports LOGO APÓS a linha do 'package' para não quebrar a sintaxe
-            sed -i '/^package /a \import android.os.Environment\nimport java.io.File' "$FILE"
+            # Adiciona imports logo após o package (apenas se não existirem)
+            grep -q "import java.io.File" "$FILE" || sed -i '/^package /a \import android.os.Environment\nimport java.io.File' "$FILE"
           done
         fi
-
-        # 2. Injeta as permissões e o Legacy Storage no AndroidManifest.xml
-        # Remove versões duplicadas se houver e garante que o app tenha acesso
-        echo "Ajustando AndroidManifest.xml..."
+        
+        # 2. Ajuste do Manifesto (Sem duplicar permissões)
         MANIFEST="app/src/main/AndroidManifest.xml"
+        echo "Ajustando AndroidManifest.xml..."
         
-        # Adiciona as permissões antes da tag <application>
-        sed -i '/<application/i <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST
-        sed -i '/<application/i <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' $MANIFEST
+        # Só adiciona se não existir
+        grep -q "WRITE_EXTERNAL_STORAGE" $MANIFEST || sed -i '/<application/i <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST
+        grep -q "READ_EXTERNAL_STORAGE" $MANIFEST || sed -i '/<application/i <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' $MANIFEST
         
-        # Habilita o requestLegacyExternalStorage (necessário para Android 10 e 11)
-        sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' $MANIFEST
-
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+        # Adiciona requestLegacyExternalStorage se não estiver lá
+        if ! grep -q "requestLegacyExternalStorage" $MANIFEST; then
+           sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' $MANIFEST
+        fi
 
     - name: Build with Gradle
-      run: ./gradlew assembleDebug --stacktrace
-
+      run: |
+        ./gradlew assembleDebug \
+          --parallel \
+          --build-cache \
+          -Dorg.gradle.jvmargs="-Xmx4g -Dfile.encoding=UTF-8" \
+          -Dorg.gradle.configuration-cache=true
+          
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Nitpicker-Custom-APK
+        name: Nitpicker-Final-APK
         path: app/build/outputs/apk/debug/app-debug.apk
