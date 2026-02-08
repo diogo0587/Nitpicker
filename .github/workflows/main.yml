@@ -2,8 +2,8 @@ name: Build Nitpicker APK
 
 on:
   push:
-    branches: [ "main" ] # Ou a sua branch padrão
-  workflow_dispatch: # Permite rodar manualmente
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -20,26 +20,47 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Modify Download Path
+    - name: Patch Download Logic and Permissions
       run: |
-        echo "Alterando o caminho de download para Download/Nit..."
-        # Busca recursiva e substituição do diretório privado pelo diretório público 'Nit'
-        # Adiciona também o import de java.io.File caso não exista
-        find app/src/main/java -name "*.kt" -exec sed -i 's/context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)/File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nit")/g' {} +
+        echo "Iniciando correções de código..."
         
-        # Garante que as classes necessárias sejam importadas
-        find app/src/main/java -name "*.kt" -exec sed -i '1i import android.os.Environment\nimport java.io.File' {} +
+        # 1. Localiza apenas arquivos que usam getExternalFilesDir e aplica a mudança
+        # Isso evita injetar lixo em arquivos que não tem nada a ver com download
+        FILES=$(grep -lR "getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)" app/src/main/java || true)
         
-        echo "Caminho modificado com sucesso."
+        if [ -z "$FILES" ]; then
+          echo "Nenhum arquivo encontrado com o padrão de download antigo."
+        else
+          for FILE in $FILES; do
+            echo "Corrigindo $FILE..."
+            # Substitui o caminho para Download/Nit
+            sed -i 's/getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)/File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nit")/g' "$FILE"
+            
+            # Insere os imports LOGO APÓS a linha do 'package' para não quebrar a sintaxe
+            sed -i '/^package /a \import android.os.Environment\nimport java.io.File' "$FILE"
+          done
+        fi
+
+        # 2. Injeta as permissões e o Legacy Storage no AndroidManifest.xml
+        # Remove versões duplicadas se houver e garante que o app tenha acesso
+        echo "Ajustando AndroidManifest.xml..."
+        MANIFEST="app/src/main/AndroidManifest.xml"
+        
+        # Adiciona as permissões antes da tag <application>
+        sed -i '/<application/i <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST
+        sed -i '/<application/i <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' $MANIFEST
+        
+        # Habilita o requestLegacyExternalStorage (necessário para Android 10 e 11)
+        sed -i 's/<application/<application android:requestLegacyExternalStorage="true"/g' $MANIFEST
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
     - name: Build with Gradle
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: Nitpicker-Custom-Folder
+        name: Nitpicker-Custom-APK
         path: app/build/outputs/apk/debug/app-debug.apk
