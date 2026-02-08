@@ -1,0 +1,45 @@
+name: Build Nitpicker APK
+
+on:
+  push:
+    branches: [ "main" ] # Ou a sua branch padrão
+  workflow_dispatch: # Permite rodar manualmente
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Modify Download Path
+      run: |
+        echo "Alterando o caminho de download para Download/Nit..."
+        # Busca recursiva e substituição do diretório privado pelo diretório público 'Nit'
+        # Adiciona também o import de java.io.File caso não exista
+        find app/src/main/java -name "*.kt" -exec sed -i 's/context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)/File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Nit")/g' {} +
+        
+        # Garante que as classes necessárias sejam importadas
+        find app/src/main/java -name "*.kt" -exec sed -i '1i import android.os.Environment\nimport java.io.File' {} +
+        
+        echo "Caminho modificado com sucesso."
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build with Gradle
+      run: ./gradlew assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Nitpicker-Custom-Folder
+        path: app/build/outputs/apk/debug/app-debug.apk
