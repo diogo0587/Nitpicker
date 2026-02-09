@@ -1,0 +1,82 @@
+name: Build Nitpicker APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: wrapper
+
+    - name: Smart Patch with Python
+      run: |
+        python3 -c '
+        import os, re
+
+        def patch_kotlin_file(filepath):
+            with open(filepath, "r") as f:
+                content = f.read()
+            
+            # 1. Substitui [qualquer_coisa].getExternalFilesDir(...) por File(...)
+            # Isso remove o "context." ou "it." que causou o erro anterior
+            pattern = r"[\w\.]*getExternalFilesDir\s*\(\s*Environment\.DIRECTORY_DOWNLOADS\s*\)"
+            replacement = "File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), \"Nit\")"
+            
+            if "getExternalFilesDir" in content:
+                print(f"Corrigindo logica de download em: {filepath}")
+                new_content = re.sub(pattern, replacement, content)
+                
+                # 2. Garante os imports necessarios logo apos o package
+                if "import java.io.File" not in new_content:
+                    import_block = "\nimport android.os.Environment\nimport java.io.File\n"
+                    new_content = re.sub(r"(package .*\n)", r"\1" + import_block, new_content)
+                
+                with open(filepath, "w") as f:
+                    f.write(new_content)
+
+        # Varre a pasta de código fonte
+        for root, dirs, files in os.walk("app/src/main/java"):
+            for file in files:
+                if file.endswith(".kt"):
+                    patch_kotlin_file(os.path.join(root, file))
+        '
+
+    - name: Fix AndroidManifest
+      run: |
+        MANIFEST="app/src/main/AndroidManifest.xml"
+        # Adiciona requestLegacyExternalStorage se não existir
+        if ! grep -q "requestLegacyExternalStorage" $MANIFEST; then
+          sed -i "s/<application/<application android:requestLegacyExternalStorage=\"true\"/g" $MANIFEST
+        fi
+        # Garante as permissões básicas
+        grep -q "WRITE_EXTERNAL_STORAGE" $MANIFEST || sed -i "/<application/i <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" />" $MANIFEST
+        grep -q "READ_EXTERNAL_STORAGE" $MANIFEST || sed -i "/<application/i <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" />" $MANIFEST
+
+    - name: Grant execute permission
+      run: chmod +x gradlew
+
+    - name: Build with Gradle
+      # Desativamos o configuration-cache aqui para garantir que as mudancas no codigo sejam lidas
+      run: ./gradlew assembleDebug --no-configuration-cache
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Nitpicker-Fixed-APK
+        path: app/build/outputs/apk/debug/app-debug.apk
