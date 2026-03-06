@@ -423,46 +423,20 @@ class DownloadManagerService @Inject constructor(
     }
 
     private suspend fun getSingleDownloadFileInfo(fileInfo: FileInfo, albumTitle: String): DownloadFileInfo {
-        val pageUrl = fileInfo.pageUrl
-        val request = Request.Builder().url(pageUrl).build()
-
-        val response: Response = withContext(Dispatchers.IO) {
-            okHttpClient.newCall(request).execute()
-        }
-        if (!response.isSuccessful) throw IOException("Failed to fetch page $pageUrl: ${response.code}")
-
-        val html = response.body?.string() ?: throw IOException("Empty body for $pageUrl")
-        val document = Jsoup.parse(html, pageUrl)
-
-        val downloadPageUrlPattern = Pattern.compile("""href="(https://get\.bunkrr\.su/file/\d+)"""")
-        val matcher = downloadPageUrlPattern.matcher(html)
-        val downloadPageUrl = if (matcher.find()) {
-            matcher.group(1) ?: throw IOException("Cannot find download page URL in $pageUrl")
-        } else {
-            throw IOException("Cannot find download page URL pattern in $pageUrl")
-        }
-
-        val fileType = fileInfo.fileType
-        val thumbnailUrl = fileInfo.thumbnailUrl
-        val fileName = fileInfo.fileName
-
+        // 脱敏Mock：根据不同的 pageUrl 返回开源的安全下载链接
         val stableId = generateStableId(fileInfo)
 
-        val domainMatch = Regex("^(https?://[^/]+)").find(thumbnailUrl)
-        val baseDomain = domainMatch?.groups?.get(1)?.value ?: throw IOException("Cannot extract domain from thumbnail $thumbnailUrl")
-
-        val fileUrl = when {
-            isImage(fileType) -> "$baseDomain/$stableId.$fileType?n=${encodeUrl(fileName)}"
-            baseDomain.contains("burger") -> "https://brg-bk.cdn.gigachad-cdn.ru/$stableId.$fileType?n=${encodeUrl(fileName)}"
-            baseDomain.contains("milkshake") -> "https://mlk-bk.cdn.gigachad-cdn.ru/$stableId.$fileType?n=${encodeUrl(fileName)}"
-            else -> "${baseDomain.replace("i-", "")}/$stableId.$fileType?n=${encodeUrl(fileName)}"
+        val fileUrl = when (fileInfo.pageUrl) {
+            "mock_page_bunny" -> "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+            "mock_page_elephant" -> "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+            else -> if (isImage(fileInfo.fileType)) fileInfo.thumbnailUrl else "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
         }
 
         return DownloadFileInfo(
             id = stableId,
-            fileName = fileName,
-            fileType = fileType,
-            downloadPageUrl = downloadPageUrl,
+            fileName = fileInfo.fileName,
+            fileType = fileInfo.fileType,
+            downloadPageUrl = fileInfo.pageUrl.ifBlank { "mock_direct_link" },
             fileUrl = fileUrl,
             albumTitle = albumTitle
         )
