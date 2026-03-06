@@ -427,9 +427,9 @@ class DownloadManagerService @Inject constructor(
         val stableId = generateStableId(fileInfo)
 
         val fileUrl = when (fileInfo.pageUrl) {
-            "mock_page_bunny" -> "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-            "mock_page_elephant" -> "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
-            else -> if (isImage(fileInfo.fileType)) fileInfo.thumbnailUrl else "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+            "mock_page_bunny" -> "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+            "mock_page_elephant" -> "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+            else -> if (isImage(fileInfo.fileType)) fileInfo.thumbnailUrl else "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
         }
 
         return DownloadFileInfo(

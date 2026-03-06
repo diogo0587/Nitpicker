@@ -23,8 +23,8 @@ class AlbumApiService @Inject constructor() {
     suspend fun firstSearch(artist: String): Pair<List<Album>, Int> = withContext(Dispatchers.IO) {
         lastSearchArtist = artist
         delay(500) // Simulate network delay
-        val maxPage = 5
-        Pair(getMockAlbums(artist, 1), maxPage)
+        val maxPage = 2
+        Pair(getMockAlbums(), maxPage)
     }
 
     /**
@@ -32,7 +32,7 @@ class AlbumApiService @Inject constructor() {
      */
     suspend fun getAlbumsByPage(artist: String, page: Int): List<Album> = withContext(Dispatchers.IO) {
         delay(500)
-        getMockAlbums(artist, page)
+        getMockAlbums()
     }
 
     /**
@@ -88,15 +88,14 @@ class AlbumApiService @Inject constructor() {
 
     fun getLastSearchArtist(): String = lastSearchArtist
 
-    private fun getMockAlbums(artist: String, page: Int): List<Album> {
+    private fun getMockAlbums(): List<Album> {
         val albums = mutableListOf<Album>()
         for (i in 1..20) {
-            val id = (page - 1) * 20 + i
             albums.add(
                 Album(
-                    title = "Media Collection $id ${if (artist.isNotBlank()) "- $artist" else ""}",
+                    title = "Open Source Test Media $i",
                     file = 4, // Matches our 4 mock files
-                    url = "mock_album_url_$id"
+                    url = "mock_album_url_$i"
                 )
             )
         }
