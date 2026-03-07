@@ -1,0 +1,204 @@
+
+> Configure project :app
+WARNING: The option setting 'android.overridePathCheck=true' is experimental.
+The current default is 'false'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+
+> Task :app:compileDebugKotlin FAILED
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/files/FilesViewModel.kt:6:17 Unresolved reference 'documentfile'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/files/FilesViewModel.kt:55:44 Unresolved reference 'DocumentFile'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/files/FilesViewModel.kt:56:66 Unresolved reference 'exists'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/files/FilesViewModel.kt:58:53 Unresolved reference 'name'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/local_album/LocalAlbumViewModel.kt:6:17 Unresolved reference 'documentfile'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/local_album/LocalAlbumViewModel.kt:65:36 Unresolved reference 'DocumentFile'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/local_album/LocalAlbumViewModel.kt:158:40 Unresolved reference 'DocumentFile'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/local_album/LocalAlbumViewModel.kt:185:43 Unresolved reference 'FolderItem'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/local_album/LocalAlbumViewModel.kt:187:9 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/local_album/LocalAlbumViewModel.kt:187:9 Argument type mismatch: actual type is 'kotlin.collections.List<T>', but 'kotlin.collections.List<ERROR CLASS: Symbol not found for FolderItem>' was expected.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:70:37 Unresolved reference 'Uri'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:73:38 Unresolved reference 'SafDirectoryViewer'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:74:35 Unresolved reference 'it'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:76:36 Overload resolution ambiguity between candidates:
+fun <T> Array<out T>.isNotEmpty(): Boolean
+fun ByteArray.isNotEmpty(): Boolean
+fun ShortArray.isNotEmpty(): Boolean
+fun IntArray.isNotEmpty(): Boolean
+fun LongArray.isNotEmpty(): Boolean
+fun FloatArray.isNotEmpty(): Boolean
+fun DoubleArray.isNotEmpty(): Boolean
+fun BooleanArray.isNotEmpty(): Boolean
+fun CharArray.isNotEmpty(): Boolean
+fun <T> Collection<T>.isNotEmpty(): Boolean
+fun <K, V> Map<out K, V>.isNotEmpty(): Boolean
+fun CharSequence.isNotEmpty(): Boolean
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:77:53 Overload resolution ambiguity between candidates:
+fun <R, T> Result<T>.map(transform: (@ParameterName(...) T) -> R): Result<R>
+    [R|Contract description]
+     <
+        CallsInPlace(transform, AT_MOST_ONCE)
+    >
+fun <T, R> Array<out T>.map(transform: (T) -> R): List<R>
+fun <R> ByteArray.map(transform: (Byte) -> R): List<R>
+fun <R> ShortArray.map(transform: (Short) -> R): List<R>
+fun <R> IntArray.map(transform: (Int) -> R): List<R>
+fun <R> LongArray.map(transform: (Long) -> R): List<R>
+fun <R> FloatArray.map(transform: (Float) -> R): List<R>
+fun <R> DoubleArray.map(transform: (Double) -> R): List<R>
+fun <R> BooleanArray.map(transform: (Boolean) -> R): List<R>
+fun <R> CharArray.map(transform: (Char) -> R): List<R>
+fun <T, R> Iterable<T>.map(transform: (T) -> R): List<R>
+fun <K, V, R> Map<out K, V>.map(transform: (Map.Entry<K, V>) -> R): List<R>
+fun <R> UIntArray.map(transform: (UInt) -> R): List<R>
+fun <R> ULongArray.map(transform: (ULong) -> R): List<R>
+fun <R> UByteArray.map(transform: (UByte) -> R): List<R>
+fun <R> UShortArray.map(transform: (UShort) -> R): List<R>
+fun <T, R> Sequence<T>.map(transform: (T) -> R): Sequence<R>
+fun <R> CharSequence.map(transform: (Char) -> R): List<R>
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:77:59 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:79:41 Unresolved reference 'Uri'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:79:61 Unresolved reference 'path'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:80:34 Unresolved reference 'setMediaId'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:80:55 Unresolved reference 'path'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:83:61 Unresolved reference 'name'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:89:67 Overload resolution ambiguity between candidates:
+fun <T> Array<out T>.contains(element: T): Boolean
+fun IntArray.contains(element: Int): Boolean
+fun <T> Iterable<T>.contains(element: T): Boolean
+fun <K, V> Map<out K, V>.contains(key: K): Boolean
+fun IntRange.contains(element: Int?): Boolean
+fun ClosedRange<Long>.contains(value: Int): Boolean
+fun ClosedRange<Byte>.contains(value: Int): Boolean
+fun ClosedRange<Short>.contains(value: Int): Boolean
+fun OpenEndRange<Long>.contains(value: Int): Boolean
+fun OpenEndRange<Byte>.contains(value: Int): Boolean
+fun OpenEndRange<Short>.contains(value: Int): Boolean
+fun LongRange.contains(value: Int): Boolean
+fun <T> Sequence<T>.contains(element: T): Boolean
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:89:81 Overload resolution ambiguity between candidates:
+val <T> Array<out T>.indices: IntRange
+val ByteArray.indices: IntRange
+val ShortArray.indices: IntRange
+val IntArray.indices: IntRange
+val LongArray.indices: IntRange
+val FloatArray.indices: IntRange
+val DoubleArray.indices: IntRange
+val BooleanArray.indices: IntRange
+val CharArray.indices: IntRange
+val Collection<*>.indices: IntRange
+val UIntArray.indices: IntRange
+val ULongArray.indices: IntRange
+val UByteArray.indices: IntRange
+val UShortArray.indices: IntRange
+val CharSequence.indices: IntRange
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:92:50 Overload resolution ambiguity between candidates:
+fun <T> Array<out T>.contains(element: T): Boolean
+fun IntArray.contains(element: Int): Boolean
+fun <T> Iterable<T>.contains(element: T): Boolean
+fun <K, V> Map<out K, V>.contains(key: K): Boolean
+fun IntRange.contains(element: Int?): Boolean
+fun ClosedRange<Long>.contains(value: Int): Boolean
+fun ClosedRange<Byte>.contains(value: Int): Boolean
+fun ClosedRange<Short>.contains(value: Int): Boolean
+fun OpenEndRange<Long>.contains(value: Int): Boolean
+fun OpenEndRange<Byte>.contains(value: Int): Boolean
+fun OpenEndRange<Short>.contains(value: Int): Boolean
+fun LongRange.contains(value: Int): Boolean
+fun <T> Sequence<T>.contains(element: T): Boolean
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:92:64 Overload resolution ambiguity between candidates:
+val <T> Array<out T>.indices: IntRange
+val ByteArray.indices: IntRange
+val ShortArray.indices: IntRange
+val IntArray.indices: IntRange
+val LongArray.indices: IntRange
+val FloatArray.indices: IntRange
+val DoubleArray.indices: IntRange
+val BooleanArray.indices: IntRange
+val CharArray.indices: IntRange
+val Collection<*>.indices: IntRange
+val UIntArray.indices: IntRange
+val ULongArray.indices: IntRange
+val UByteArray.indices: IntRange
+val UShortArray.indices: IntRange
+val CharSequence.indices: IntRange
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:95:47 Overload resolution ambiguity between candidates:
+fun <T> Array<out T>.isNotEmpty(): Boolean
+fun ByteArray.isNotEmpty(): Boolean
+fun ShortArray.isNotEmpty(): Boolean
+fun IntArray.isNotEmpty(): Boolean
+fun LongArray.isNotEmpty(): Boolean
+fun FloatArray.isNotEmpty(): Boolean
+fun DoubleArray.isNotEmpty(): Boolean
+fun BooleanArray.isNotEmpty(): Boolean
+fun CharArray.isNotEmpty(): Boolean
+fun <T> Collection<T>.isNotEmpty(): Boolean
+fun <K, V> Map<out K, V>.isNotEmpty(): Boolean
+fun CharSequence.isNotEmpty(): Boolean
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:124:61 Overload resolution ambiguity between candidates:
+fun <T> Array<out T>.getOrNull(index: Int): T?
+fun ByteArray.getOrNull(index: Int): Byte?
+fun ShortArray.getOrNull(index: Int): Short?
+fun IntArray.getOrNull(index: Int): Int?
+fun LongArray.getOrNull(index: Int): Long?
+fun FloatArray.getOrNull(index: Int): Float?
+fun DoubleArray.getOrNull(index: Int): Double?
+fun BooleanArray.getOrNull(index: Int): Boolean?
+fun CharArray.getOrNull(index: Int): Char?
+fun <T> List<T>.getOrNull(index: Int): T?
+fun UIntArray.getOrNull(index: Int): UInt?
+fun ULongArray.getOrNull(index: Int): ULong?
+fun UByteArray.getOrNull(index: Int): UByte?
+fun UShortArray.getOrNull(index: Int): UShort?
+fun CharSequence.getOrNull(index: Int): Char?
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerViewModel.kt:124:89 Unresolved reference 'mediaMetadata'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/util/SafDirectoryViewer.kt:6:17 Unresolved reference 'documentfile'.
+e: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/util/SafDirectoryViewer.kt:21:28 Unresolved reference 'DocumentFile'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 7s
+29 actionable tasks: 1 executed, 28 up-to-date

@@ -1,32 +1,32 @@
-package com.d3intran.nitpicker.screen.files // Corrected package name
+package com.d3intran.nitpicker.screen.files
 
-import android.app.Application
-import android.os.Environment
+import android.content.Context
+import android.net.Uri
 import android.util.Log
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.d3intran.nitpicker.repository.SafRepository
+import com.d3intran.nitpicker.worker.MediaTaggingWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update // Add this import
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.IOException // Add import
 import javax.inject.Inject
 
-class FolderAlreadyExistsException(message: String) : IOException(message)
-class InvalidFolderNameException(message: String) : IllegalArgumentException(message)
-
-// Keep FolderItem data class
 data class FolderItem(
     val name: String,
-    val path: String
+    val path: String // We now store the URI string here
 )
 
-// Define UI State similar to HomeUiState
 data class FilesUiState(
     val folders: List<FolderItem> = emptyList(),
     val isLoading: Boolean = false,
@@ -35,204 +35,87 @@ data class FilesUiState(
 
 @HiltViewModel
 class FilesViewModel @Inject constructor(
-    private val application: Application
+    @ApplicationContext private val context: Context,
+    private val safRepository: SafRepository
 ) : ViewModel() {
 
-    // Expose UI State
-    private val _uiState = MutableStateFlow(FilesUiState())
+    private val workManager = WorkManager.getInstance(context)
+
+    private val _uiState = MutableStateFlow(FilesUiState(isLoading = true))
     val uiState: StateFlow<FilesUiState> = _uiState.asStateFlow()
 
     init {
-        loadFolders()
+        observeSafDirectories()
     }
 
-    // Function to load folders, updating the UI state
-    fun loadFolders() {
+    private fun observeSafDirectories() {
         viewModelScope.launch {
-            // Update state to loading
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            try {
-                val downloadDir = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                if (downloadDir != null && downloadDir.exists() && downloadDir.isDirectory) {
-                    val directories = downloadDir.listFiles { file ->
-                        file.isDirectory
-                    } ?: emptyArray()
-
-                    val folderItems = directories.map { FolderItem(it.name, it.absolutePath) }
-                                             .sortedBy { it.name }
-                    Log.d("FilesViewModel", "Found ${folderItems.size} folders in ${downloadDir.absolutePath}")
-                    // Update state with loaded folders
+            safRepository.savedDirectoriesFlow
+                .catch { e ->
+                    Log.e("FilesViewModel", "Error loading SAF directories", e)
+                    _uiState.update { it.copy(isLoading = false, error = "Failed to load libraries: ${e.message}") }
+                }
+                .collect { uris ->
+                    _uiState.update { it.copy(isLoading = true, error = null) }
+                    
+                    val folderItems = uris.mapNotNull { uri ->
+                        val documentFile = DocumentFile.fromTreeUri(context, uri)
+                        if (documentFile != null && documentFile.exists()) {
+                            // 确保每个已授权的目录都在后台进行索引扫描（使用 KEEP 避免重复任务）
+                            enqueueIndexingWorker(uri, ExistingWorkPolicy.KEEP)
+                            
+                            FolderItem(
+                                name = documentFile.name ?: "Unknown Folder",
+                                path = uri.toString()
+                            )
+                        } else {
+                            Log.w("FilesViewModel", "Document file missing or invalid for URI: $uri")
+                            null
+                        }
+                    }.sortedBy { it.name }
+                    
                     _uiState.update { it.copy(folders = folderItems, isLoading = false) }
-                } else {
-                    Log.w("FilesViewModel", "Download directory not found or not accessible: ${downloadDir?.absolutePath}")
-                    // Update state with empty list and potentially an error
-                    _uiState.update { it.copy(folders = emptyList(), isLoading = false/*, error = "Download directory not found."*/) }
                 }
-            } catch (e: SecurityException) {
-                Log.e("FilesViewModel", "Permission denied accessing download directory", e)
-                // Update state with error
-                _uiState.update { it.copy(error = "Permission denied accessing storage.", isLoading = false, folders = emptyList()) }
-            } catch (e: Exception) {
-                Log.e("FilesViewModel", "Error loading folders", e)
-                // Update state with error
-                _uiState.update { it.copy(error = "Error loading folders: ${e.localizedMessage}", isLoading = false, folders = emptyList()) }
-            }
-            // No finally needed as isLoading is set within update calls
         }
     }
 
-    // Function to create a new folder
-    suspend fun createFolder(folderName: String) { // Make it suspend if not already
-        val trimmedName = folderName.trim()
-        // Basic validation - throw specific exception
-        if (trimmedName.isBlank() || trimmedName.contains("/") || trimmedName.contains("\\")) {
-            throw InvalidFolderNameException("Invalid characters in name or name is empty.")
-        }
-
-        try {
-            val downloadDir = application.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-            if (downloadDir == null || !downloadDir.exists() || !downloadDir.isDirectory) {
-                throw IOException("Download directory not accessible.") // Keep throwing for general IO errors
-            }
-
-            val newFolder = File(downloadDir, trimmedName)
-
-            // Check if file/folder already exists - throw specific exception
-            if (newFolder.exists()) {
-                throw FolderAlreadyExistsException("Folder '$trimmedName' already exists.")
-            }
-
-            // Attempt to create the directory
-            val success = withContext(Dispatchers.IO) {
-                newFolder.mkdir()
-            }
-
-            if (success) {
-                Log.d("FilesViewModel", "Created folder: '${newFolder.absolutePath}'")
-                // Reload folders to show the new one - Keep this on success
-                // Launching loadFolders in a new coroutine to avoid blocking the createFolder result
-                viewModelScope.launch { loadFolders() }
-            } else {
-                // Throw general IO error if mkdir fails for unknown reasons
-                throw IOException("Failed to create folder. Check storage permissions.")
-            }
-
-        } catch (e: SecurityException) {
-            Log.e("FilesViewModel", "Permission denied during folder creation", e)
-            // Update global error state for permission issues
-            _uiState.update { it.copy(error = "Permission denied during folder creation.", isLoading = false) }
-            throw e // Re-throw if needed, or handle differently
-        } catch (e: IOException) {
-            // Catch specific exceptions first if they are IOExceptions
-            if (e is FolderAlreadyExistsException || e is InvalidFolderNameException) {
-                throw e // Re-throw our specific exceptions
-            }
-            // Handle other IO errors globally
-            Log.e("FilesViewModel", "IO error during folder creation", e)
-            _uiState.update { it.copy(error = "Create folder failed: ${e.message}", isLoading = false) }
-            throw e // Re-throw if needed
-        } catch (e: Exception) {
-             // Catch our specific exceptions if they are not IOExceptions
-            if (e is InvalidFolderNameException) {
-                 throw e // Re-throw our specific exceptions
-            }
-            // Handle other unexpected errors globally
-            Log.e("FilesViewModel", "Unexpected error during folder creation", e)
-            _uiState.update { it.copy(error = "An unexpected error occurred.", isLoading = false) }
-            throw e // Re-throw if needed
-        }
-        // No finally block needed to reset isLoading as it's handled by loadFolders or error updates
-    }
-
-    // Function to rename a folder
-    fun renameFolder(oldPath: String, newName: String) {
-        // Basic validation for the new name (prevent empty, slashes, etc.)
-        if (newName.isBlank() || newName.contains("/") || newName.contains("\\")) {
-            _uiState.update { it.copy(error = "Invalid folder name.") }
-            return
-        }
-
+    fun addSafDirectory(uri: Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) } // Show loading during rename
             try {
-                val oldFile = File(oldPath)
-                // Ensure the parent directory exists (should generally be the case here)
-                val parentDir = oldFile.parentFile
-                if (parentDir == null || !oldFile.exists() || !oldFile.isDirectory) {
-                    throw IOException("Original folder not found or invalid.")
-                }
-
-                val newFile = File(parentDir, newName)
-
-                // Check if a file/folder with the new name already exists
-                if (newFile.exists()) {
-                    throw IOException("A folder or file with the name '$newName' already exists.")
-                }
-
-                val success = withContext(Dispatchers.IO) {
-                    oldFile.renameTo(newFile)
-                }
-
-                if (success) {
-                    Log.d("FilesViewModel", "Renamed '$oldPath' to '$newName'")
-                    // Reload folders to reflect the change
-                    loadFolders() // This will set isLoading back to false on completion/error
-                } else {
-                    throw IOException("Failed to rename folder. Check storage permissions or file system.")
-                }
-
-            } catch (e: SecurityException) {
-                Log.e("FilesViewModel", "Permission denied during rename", e)
-                _uiState.update { it.copy(error = "Permission denied during rename.", isLoading = false) }
-            } catch (e: IOException) {
-                Log.e("FilesViewModel", "IO error during rename", e)
-                _uiState.update { it.copy(error = "Rename failed: ${e.message}", isLoading = false) }
+                safRepository.addDirectory(uri)
+                // 启动后台索引任务（新添加目录使用 REPLACE 确保立即开始）
+                enqueueIndexingWorker(uri, ExistingWorkPolicy.REPLACE)
             } catch (e: Exception) {
-                Log.e("FilesViewModel", "Unexpected error during rename", e)
-                _uiState.update { it.copy(error = "An unexpected error occurred during rename.", isLoading = false) }
+                _uiState.update { it.copy(error = "Failed to add directory: ${e.message}") }
             }
         }
     }
 
-    // Function to delete a folder
-    fun deleteFolder(path: String) {
+    private fun enqueueIndexingWorker(uri: Uri, policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP) {
+        val workRequest = OneTimeWorkRequestBuilder<MediaTaggingWorker>()
+            .setInputData(workDataOf("folderUri" to uri.toString()))
+            .build()
+        
+        workManager.enqueueUniqueWork(
+            "indexing_${uri.toString().hashCode()}",
+            policy,
+            workRequest
+        )
+        Log.d("FilesViewModel", "Enqueued indexing worker for: $uri with policy: $policy")
+    }
+
+    fun removeFolder(uriString: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) } // Indicate loading during delete
             try {
-                val folder = File(path)
-                if (!folder.exists() || !folder.isDirectory) {
-                    throw IOException("Folder not found or invalid.")
-                }
-
-                // Recursively delete the folder and its contents
-                val success = withContext(Dispatchers.IO) {
-                    folder.deleteRecursively()
-                }
-
-                if (success) {
-                    Log.d("FilesViewModel", "Deleted folder: '$path'")
-                    // Reload folders to reflect the change
-                    loadFolders() // Refreshes the list and sets isLoading to false
-                } else {
-                    // deleteRecursively might return false if some files couldn't be deleted
-                    throw IOException("Failed to delete folder or some of its contents. Check permissions.")
-                }
-
-            } catch (e: SecurityException) {
-                Log.e("FilesViewModel", "Permission denied during delete", e)
-                _uiState.update { it.copy(error = "Permission denied during delete.", isLoading = false) }
-            } catch (e: IOException) {
-                Log.e("FilesViewModel", "IO error during delete", e)
-                _uiState.update { it.copy(error = "Delete failed: ${e.message}", isLoading = false) }
+                safRepository.removeDirectory(Uri.parse(uriString))
             } catch (e: Exception) {
-                Log.e("FilesViewModel", "Unexpected error during delete", e)
-                _uiState.update { it.copy(error = "An unexpected error occurred during delete.", isLoading = false) }
+                _uiState.update { it.copy(error = "Failed to remove directory: ${e.message}") }
             }
         }
     }
 
-    // Optional: Add a retry function if needed, similar to HomeViewModel
     fun retry() {
-        loadFolders()
+        // StateFlow collection handles updates natively, but if it faults we could restart it
+        observeSafDirectories()
     }
 }

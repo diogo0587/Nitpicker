@@ -1,0 +1,79 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: The option setting 'android.overridePathCheck=true' is experimental.
+The current default is 'false'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeDebugJniLibFolders
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugNativeLibs
+> Task :app:processDebugManifestForPackage
+> Task :app:mergeExtDexDebug
+> Task :app:mergeLibDexDebug
+> Task :app:validateSigningDebug
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
+
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:processDebugResources
+> Task :app:kspDebugKotlin
+
+> Task :app:compileDebugKotlin
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/MainActivity.kt:81:32 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/MainActivity.kt:82:32 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/MainActivity.kt:94:32 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/MainActivity.kt:97:32 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/image/ImageView.kt:65:45 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/image/ImageView.kt:66:42 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/image/ImageView.kt:71:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/image/ImageView.kt:72:16 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/local_album/LocalAlbumView.kt:356:60 'val Icons.Filled.DriveFileMove: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DriveFileMove.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerView.kt:70:45 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerView.kt:71:42 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerView.kt:76:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerView.kt:77:16 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///E:/面试/Nitpicker/app/src/main/java/com/d3intran/nitpicker/screen/player/PlayerView.kt:300:85 Condition is always 'true'.
+
+> Task :app:compileDebugJavaWithJavac
+warning: The following options were not recognized by any processor: '[dagger.fastInit, dagger.hilt.android.internal.disableAndroidSuperclassValidation, dagger.hilt.android.internal.projectType, dagger.hilt.internal.useAggregatingRootProcessor]'
+1 warning
+
+> Task :app:hiltAggregateDepsDebug
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:mergeDebugJavaResource
+> Task :app:transformDebugClassesWithAsm
+> Task :app:dexBuilderDebug
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+[Incubating] Problems report is available at: file:///E:/%E9%9D%A2%E8%AF%95/Nitpicker/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 35s
+39 actionable tasks: 39 executed

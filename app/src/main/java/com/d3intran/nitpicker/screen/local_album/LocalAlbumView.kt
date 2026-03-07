@@ -29,8 +29,11 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material3.*
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -475,11 +478,35 @@ fun LocalFileItemRow(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = formatFileSize(fileInfo.size),
+                                text = formatFileSize(fileInfo.size),
                             color = Color(0xFFAAAAAA),
                             fontSize = 10.sp,
                             maxLines = 1
                         )
+                        
+                        if (fileInfo.tags.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(fileInfo.tags) { tag ->
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFF6D28D9).copy(alpha = 0.2f),
+                                        modifier = Modifier.height(14.dp)
+                                    ) {
+                                        Text(
+                                            text = tag,
+                                            color = Color(0xFFA78BFA),
+                                            fontSize = 8.sp,
+                                            modifier = Modifier.padding(horizontal = 4.dp),
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     if (fileInfo.type == FileType.VIDEO && fileInfo.durationMillis != null && fileInfo.durationMillis > 0) {
@@ -490,6 +517,35 @@ fun LocalFileItemRow(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             textAlign = TextAlign.End
+                        )
+                    }
+                }
+            }
+
+            if (fileInfo.faceCount > 0) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color.Black.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Face,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = fileInfo.faceCount.toString(),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }

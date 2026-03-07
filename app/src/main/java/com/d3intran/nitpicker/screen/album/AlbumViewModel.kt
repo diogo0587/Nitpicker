@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.d3intran.nitpicker.model.FileInfo
-import com.d3intran.nitpicker.repository.AlbumRepository
+import com.d3intran.nitpicker.repository.MediaRepository
 import com.d3intran.nitpicker.service.DownloadManagerService // Import DownloadManagerService
 import dagger.hilt.android.lifecycle.HiltViewModel // Import HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -35,7 +35,7 @@ enum class FilterType { ALL, IMAGES, OTHER }
 class AlbumViewModel @Inject constructor( // Use @Inject constructor
     private val savedStateHandle: SavedStateHandle,
     private val downloadManagerService: DownloadManagerService, // Inject DownloadManagerService
-    private val repository: AlbumRepository // Inject Repository if provided via Hilt, otherwise keep internal instance
+    private val repository: MediaRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AlbumUiState())

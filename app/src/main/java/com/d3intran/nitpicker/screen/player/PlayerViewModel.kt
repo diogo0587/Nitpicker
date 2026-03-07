@@ -1,8 +1,10 @@
 package com.d3intran.nitpicker.screen.player
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.core.net.toUri
+import com.d3intran.nitpicker.util.SafDirectoryViewer
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,7 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
@@ -63,21 +64,25 @@ class PlayerViewModel @Inject constructor(
             val restoredPosition = savedStateHandle.get<Long>("playbackPosition") ?: 0L
             val restoredPlayWhenReady = savedStateHandle.get<Boolean>("playWhenReady") ?: true
 
-            Log.d("PlayerViewModel", "loadPlaylist - Received path: $encodedPath, navInitialIndex: $navInitialIndex, restoredIndex: $restoredIndex")
+            Log.d("PlayerViewModel", "loadPlaylist - Received encoded URI: $encodedPath, navInitialIndex: $navInitialIndex, restoredIndex: $restoredIndex")
 
             if (encodedPath.isNotEmpty()) {
                 try {
-                    val folderPath = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8.toString())
-                    val videoFiles = loadVideosFromFolder(folderPath)
+                    val folderUriString = encodedPath
+                    val folderUri = Uri.parse(folderUriString)
+                    
+                    // Use SafDirectoryViewer to load videos from the URI
+                    val videoFiles = SafDirectoryViewer.listFilesFromUri(application, folderUri)
+                        .filter { it.type == com.d3intran.nitpicker.model.FileType.VIDEO }
 
                     if (videoFiles.isNotEmpty()) {
-                        val mediaItems = videoFiles.map { file ->
+                        val mediaItems = videoFiles.map { localFile ->
                             MediaItem.Builder()
-                                .setUri(file.toUri())
-                                .setMediaId(file.absolutePath)
+                                .setUri(Uri.parse(localFile.path))
+                                .setMediaId(localFile.path)
                                 .setMediaMetadata(
                                     androidx.media3.common.MediaMetadata.Builder()
-                                        .setTitle(file.name)
+                                        .setTitle(localFile.name)
                                         .build()
                                 )
                                 .build()
@@ -141,23 +146,6 @@ class PlayerViewModel @Inject constructor(
             } else {
                 _uiState.update { it.copy(error = "Folder path not provided.", isLoading = false, mediaItems = emptyList()) }
             }
-        }
-    }
-
-    private suspend fun loadVideosFromFolder(folderPath: String): List<File> = withContext(Dispatchers.IO) {
-        try {
-            val folder = File(folderPath)
-            if (folder.exists() && folder.isDirectory) {
-                folder.listFiles { file ->
-                    file.isFile && videoExtensions.contains(file.extension.lowercase(Locale.ROOT))
-                }?.sortedBy { it.name } ?: emptyList()
-            } else {
-                Log.w("PlayerViewModel", "Folder not found or not a directory: $folderPath")
-                emptyList()
-            }
-        } catch (e: Exception) {
-            Log.e("PlayerViewModel", "Error loading videos from folder: $folderPath", e)
-            emptyList()
         }
     }
 

@@ -1,4 +1,3 @@
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -58,6 +57,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.material)
+    implementation(libs.androidx.documentfile)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.compose.foundation)
@@ -66,10 +66,11 @@ dependencies {
     implementation(libs.androidx.material3.windowsizeclass)
     implementation(libs.androidx.adaptive)
     implementation(libs.android.coil)
+    implementation(libs.android.coil.video)
     implementation(libs.zoomable)
     implementation(libs.android.okhttp3)
-    implementation(libs.androidx.media3.exoplayer) // Check for the latest version
-    implementation(libs.androidx.media3.ui)      // For the PlayerView UI component
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
     implementation(libs.android.jsoup)
     implementation(libs.hilt.android)
@@ -77,6 +78,11 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.core.splashscreen)
     ksp(libs.hilt.compiler)
+    
+    // Hilt Worker
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.work.compiler)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -85,4 +91,14 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     
+    // DataStore for saving SAF Uris
+    implementation(libs.androidx.datastore.preferences)
+
+    // ML Kit for local AI processing
+    implementation(libs.mlkit.objectDetection)
+    implementation(libs.mlkit.faceDetection)
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    // WorkManager for background tasks
+    implementation(libs.androidx.work.runtime.ktx)
 }

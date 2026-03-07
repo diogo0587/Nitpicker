@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
@@ -54,15 +53,19 @@ class ImageViewModel @Inject constructor(
             val navInitialIndex = savedStateHandle.get<Int>("initialIndex") ?: -1
             val restoredIndex = savedStateHandle.get<Int>("currentImageIndex") ?: -1
 
-            Log.d("ImageViewModel", "loadImages - Received path: $encodedPath, navInitialIndex: $navInitialIndex, restoredIndex: $restoredIndex")
+            Log.d("ImageViewModel", "loadImages - Received encoded URI: $encodedPath, navInitialIndex: $navInitialIndex, restoredIndex: $restoredIndex")
 
             if (encodedPath.isNotEmpty()) {
                 try {
-                    val folderPath = URLDecoder.decode(encodedPath, StandardCharsets.UTF_8.toString())
-                    val imageFiles = loadImageFilesFromFolder(folderPath)
+                    val folderUriString = encodedPath
+                    val folderUri = Uri.parse(folderUriString)
+                    
+                    // Use SafDirectoryViewer to load images from the URI
+                    val imageFiles = com.d3intran.nitpicker.util.SafDirectoryViewer.listFilesFromUri(application, folderUri)
+                        .filter { it.type == com.d3intran.nitpicker.model.FileType.IMAGE }
 
                     if (imageFiles.isNotEmpty()) {
-                        val imageUris = imageFiles.map { it.toUri() }
+                        val imageUris = imageFiles.map { Uri.parse(it.path) }
                         val imageNames = imageFiles.map { it.name }
 
                         val finalStartIndex = if (navInitialIndex in imageUris.indices) {
@@ -103,23 +106,6 @@ class ImageViewModel @Inject constructor(
             } else {
                 _uiState.update { it.copy(error = "Folder path not provided.", isLoading = false) }
             }
-        }
-    }
-
-    private suspend fun loadImageFilesFromFolder(folderPath: String): List<File> = withContext(Dispatchers.IO) {
-        try {
-            val folder = File(folderPath)
-            if (folder.exists() && folder.isDirectory) {
-                folder.listFiles { file ->
-                    file.isFile && imageExtensions.contains(file.extension.lowercase(Locale.ROOT))
-                }?.sortedBy { it.name } ?: emptyList()
-            } else {
-                Log.w("ImageViewModel", "Folder not found or not a directory: $folderPath")
-                emptyList()
-            }
-        } catch (e: Exception) {
-            Log.e("ImageViewModel", "Error loading image files from folder: $folderPath", e)
-            emptyList()
         }
     }
 

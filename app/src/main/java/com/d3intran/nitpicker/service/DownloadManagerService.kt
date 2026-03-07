@@ -27,12 +27,67 @@ import java.util.regex.Pattern
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * 下载任务管理服务（核心引擎）。
+ *
+ * 负责管理所有媒体文件的下载生命周期，包括任务入队、并发调度、
+ * 断点续传、异常恢复和状态持久化。这是整个应用最复杂的组件。
+ *
+ * ## 架构设计
+ *
+ * ```
+ * enqueueDownloads()
+ *       ↓
+ *  按文件类型分流
+ *  ┌─────────────────┬──────────────────┐
+ *  │   图片文件        │   其它文件(视频等)  │
+ *  │                  │                   │
+ *  │  先批量解析URL    │   逐个获取 permit  │
+ *  │  (Semaphore=5)   │   (Semaphore=1)   │
+ *  │  再并发下载       │   串行下载          │
+ *  │  imageDispatcher │  otherDispatcher   │
+ *  │  (5 threads)     │  (1 thread)        │
+ *  └────────┬────────┘──────────┬─────────┘
+ *           ↓                   ↓
+ *       performDownload()
+ *       · 断点续传 (Range Header)
+ *       · HTTP 416 智能恢复
+ *       · 实时进度更新 (Room → Flow → UI)
+ * ```
+ *
+ * ## 并发控制策略
+ * - **图片**：使用 5 线程的固定线程池 + Semaphore(5) 控制 URL 解析并发度
+ * - **视频/大文件**：单线程串行下载，Semaphore(1) 保证同一时刻只有一个大文件在下载
+ * - **设计原因**：图片文件小、数量多，适合并发；视频文件大，串行下载避免带宽竞争和 OOM
+ *
+ * ## 断点续传与 HTTP 416
+ * 当续传请求的 Range 超过服务器上的文件大小时，服务器返回 HTTP 416。
+ * 此时不是直接报错，而是：
+ * 1. 发送 HEAD 请求获取 Content-Length
+ * 2. 如果本地文件大小 == 服务器文件大小 → 判定为已完成
+ * 3. 否则 → 清空本地缓存文件，从头下载
+ *
+ * ## 状态持久化与 UI 响应式更新
+ * 所有下载状态通过 [DownloadTaskDao] 持久化到 Room 数据库。
+ * UI 层通过 [downloadState] (StateFlow) 观察状态变化，实现实时进度展示。
+ *
+ * @property context 应用上下文（用于获取文件存储路径）
+ * @property okHttpClient 共享的 HTTP 客户端
+ * @property downloadTaskDao Room DAO，负责任务状态的持久化读写
+ */
 @Singleton
 class DownloadManagerService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val okHttpClient: OkHttpClient,
     private val downloadTaskDao: DownloadTaskDao
 ) {
+    /**
+     * 所有下载任务的实时状态，作为 StateFlow 暴露给 UI 层。
+     *
+     * 数据流：Room DB → Flow<List<Entity>> → map → Map<id, Progress> → StateFlow
+     * UI 层（DownloadViewModel）通过 collect 观察变化，自动驱动 recomposition。
+     * [SharingStarted.WhileSubscribed] 保证没有订阅者时停止监听，节省资源。
+     */
     val downloadState: StateFlow<Map<String, DownloadProgress>> =
         downloadTaskDao.getAllTasksFlow()
             .map { taskEntities ->
@@ -46,11 +101,20 @@ class DownloadManagerService @Inject constructor(
                 initialValue = emptyMap()
             )
 
+    /** 活跃下载任务的 Job 映射，用于取消和去重。线程安全的 ConcurrentHashMap。 */
     private val jobMap = ConcurrentHashMap<String, Job>()
+
+    /** 图片下载专用调度器：5 线程并发，适合小文件批量下载 */
     private val imageDownloadDispatcher = Executors.newFixedThreadPool(5).asCoroutineDispatcher()
+
+    /** 大文件下载专用调度器：单线程串行，避免带宽竞争 */
     private val otherDownloadDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    private val urlFetchSemaphore = Semaphore(5) // For image URL fetching
-    private val otherDownloadSemaphore = Semaphore(1) // New: For controlling the entire "other" download process
+
+    /** 图片 URL 解析并发限制器：最多同时解析 5 个图片的下载地址 */
+    private val urlFetchSemaphore = Semaphore(5)
+
+    /** 大文件下载互斥锁：保证同时只有 1 个大文件在下载 */
+    private val otherDownloadSemaphore = Semaphore(1)
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -68,6 +132,14 @@ class DownloadManagerService @Inject constructor(
         }
     }
 
+    /**
+     * 将一批文件加入下载队列（主入口）。
+     *
+     * 流程：
+     * 1. 为每个文件创建 [DownloadTaskEntity] 并持久化到 Room
+     * 2. 按类型分流：图片走并发路径，其它走串行路径
+     * 3. 对于已存在的 Error/Cancelled 任务，重置状态后重新入队
+     */
     fun enqueueDownloads(files: List<FileInfo>, albumTitle: String) {
         CoroutineScope(Dispatchers.IO).launch {
             val initialTaskEntities = files.map { fileInfo ->
@@ -442,6 +514,17 @@ class DownloadManagerService @Inject constructor(
         )
     }
 
+    /**
+     * 执行实际的文件下载（核心下载逻辑）。
+     *
+     * 支持断点续传：
+     * 1. 检查本地已有文件和 downloadedBytes
+     * 2. 如果匹配，添加 Range Header 从断点继续
+     * 3. 如果不匹配（文件损坏），清空后从头下载
+     * 4. 遇到 HTTP 416 时，通过 HEAD 请求校验是否实际已完成
+     *
+     * 进度更新策略：每 300ms 写入一次 Room，避免频繁 IO
+     */
     private suspend fun performDownload(downloadInfo: DownloadFileInfo) {
         val downloadId = downloadInfo.id
         var currentTask = downloadTaskDao.getTaskById(downloadId) ?: run {

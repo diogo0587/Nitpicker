@@ -124,9 +124,9 @@ class MainActivity : ComponentActivity() {
                             Spacer(Modifier.height(12.dp))
                             // --- Drawer Items ---
                             DrawerItem(
-                                label = stringResource(id = R.string.drawer_home),
-                                icon = Icons.Filled.Home,
-                                route = "home_screen",
+                                label = stringResource(id = R.string.drawer_files),
+                                icon = Icons.Filled.Folder,
+                                route = "files_screen",
                                 currentRoute = currentRoute,
                                 navController = navController,
                                 closeDrawer = {
@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 },
-                                scope = scope, // <-- 传递 scope
+                                scope = scope,
                                 lastNavTime = lastNavTime,
                                 debounceDelay = debounceDelay,
                                 updateLastNavTime = { newTime -> lastNavTime = newTime }
@@ -158,15 +158,15 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 },
-                                scope = scope, // <-- 传递 scope
+                                scope = scope,
                                 lastNavTime = lastNavTime,
                                 debounceDelay = debounceDelay,
                                 updateLastNavTime = { newTime -> lastNavTime = newTime }
                             )
                             DrawerItem(
-                                label = stringResource(id = R.string.drawer_files),
-                                icon = Icons.Filled.Folder,
-                                route = "files_screen",
+                                label = stringResource(id = R.string.drawer_home),
+                                icon = Icons.Filled.Home,
+                                route = "home_screen",
                                 currentRoute = currentRoute,
                                 navController = navController,
                                 closeDrawer = {
@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 },
-                                scope = scope, // <-- 传递 scope
+                                scope = scope,
                                 lastNavTime = lastNavTime,
                                 debounceDelay = debounceDelay,
                                 updateLastNavTime = { newTime -> lastNavTime = newTime }
@@ -189,15 +189,10 @@ class MainActivity : ComponentActivity() {
                     Surface(
                         modifier = Modifier
                             .fillMaxSize()
-                            // Apply navigation bar padding here if needed globally,
-                            // or handle it within each screen's Scaffold content padding
-                            .navigationBarsPadding(), // Apply nav bar padding to push content up
-                        color = MaterialTheme.colorScheme.background // Use theme background
+                            .navigationBarsPadding(),
+                        color = MaterialTheme.colorScheme.background
                     ) {
-                        NavHost(navController = navController, startDestination = "home_screen") {
-                            // --- Screen composables ---
-                            // Ensure these composables DO NOT apply statusBarsPadding() themselves globally
-                            // but DO apply it to their TopAppBar
+                        NavHost(navController = navController, startDestination = "files_screen") {
                             composable("home_screen") {
                                 HomeScreen(
                                     homeViewModel = hiltViewModel(),

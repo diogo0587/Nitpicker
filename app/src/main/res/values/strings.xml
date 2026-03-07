@@ -1,9 +1,9 @@
 <!-- filepath: e:\Android\nitpicker\app\src\main\res\values\strings.xml -->
 <resources>
     <string name="app_name">Nitpicker</string>
-    <string name="drawer_home">Home</string>
+    <string name="drawer_home">Online Search</string>
     <string name="drawer_downloads">Downloads</string>
-    <string name="drawer_files">Files</string>
+    <string name="drawer_files">Material Base</string>
 
     <!-- Common Actions -->
     <string name="action_back">Back</string>
@@ -66,8 +66,8 @@
     <string name="download_action_cancel_cd">Cancel</string>
     <string name="download_action_retry_cd">Retry</string>
 
-    <!-- Files Screen -->
-    <string name="files_title">Files</string>
+    <!-- Material Base (SAF) Screen -->
+    <string name="files_title">Material Base</string>
     <string name="files_create_folder_cd">Create Folder</string>
     <string name="files_error_title">Error loading folders</string>
     <string name="files_empty">No folders found</string>

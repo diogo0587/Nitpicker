@@ -1,16 +1,18 @@
 package com.d3intran.nitpicker.screen.home
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.d3intran.nitpicker.db.MediaMetadataDao
 import com.d3intran.nitpicker.model.Album
-import com.d3intran.nitpicker.repository.AlbumRepository
+import com.d3intran.nitpicker.model.FileType
+import com.d3intran.nitpicker.model.LocalFileItem
+import com.d3intran.nitpicker.repository.MediaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -18,7 +20,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: AlbumRepository
+    private val repository: MediaRepository,
+    private val mediaMetadataDao: MediaMetadataDao
 ) : ViewModel() {
     
     // UI状态
@@ -29,11 +32,94 @@ class HomeViewModel @Inject constructor(
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
     
+    init {
+        loadAIInsights()
+    }
+
+    private fun loadAIInsights() {
+        // 使用 Flow 观察数据变化，实现 UI 实时更新
+        mediaMetadataDao.getAllMetadata()
+            .onEach { allMetadata ->
+                val totalFaces = allMetadata.sumOf { it.faceCount }
+                val totalObjects = allMetadata.sumOf { it.objectCount }
+                
+                // 获取热门标签
+                val allTags = allMetadata.flatMap { it.tags }
+                val topTags = allTags.groupingBy { it }
+                    .eachCount()
+                    .toList()
+                    .sortedByDescending { it.second }
+                    .take(10)
+                    .map { it.first }
+
+                _uiState.update { it.copy(
+                    stats = AIStats(
+                        totalIndexedItems = allMetadata.size,
+                        totalFacesDetected = totalFaces,
+                        totalObjectsDetected = totalObjects
+                    ),
+                    topTags = topTags
+                ) }
+            }
+            .launchIn(viewModelScope)
+    }
+
     /**
      * 更新搜索文本
      */
     fun updateSearchText(text: String) {
         _searchText.value = text
+        // 当文本改变时同步搜索本地
+        if (text.length >= 2) {
+            searchLocalAI(text)
+        } else if (text.isEmpty()) {
+            _uiState.update { it.copy(localResults = emptyList()) }
+        }
+    }
+
+    private fun searchLocalAI(query: String) {
+        viewModelScope.launch {
+            val results = mediaMetadataDao.searchByTag("%$query%").first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    /**
+     * 显示所有检测到人脸的媒体
+     */
+    fun showFaces() {
+        _searchText.value = "Faces"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getMetadataWithFaces().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    /**
+     * 显示所有检测到物体的媒体
+     */
+    fun showObjects() {
+        _searchText.value = "Objects"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getMetadataWithObjects().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    private fun mapMetadataToLocalFiles(results: List<com.d3intran.nitpicker.db.MediaMetadataEntity>): List<LocalFileItem> {
+        return results.map { meta ->
+            LocalFileItem(
+                path = meta.uri,
+                name = meta.uri.substringAfterLast('/'),
+                type = if (meta.uri.endsWith(".mp4", true)) FileType.VIDEO else FileType.IMAGE,
+                thumbnailUri = Uri.parse(meta.uri),
+                size = 0,
+                lastModified = 0,
+                tags = meta.tags,
+                faceCount = meta.faceCount,
+                objectCount = meta.objectCount
+            )
+        }
     }
     
     /**
@@ -87,7 +173,7 @@ class HomeViewModel @Inject constructor(
             Log.w("HomeViewModel", "Attempted to load invalid page: $page")
             return
         }
-        val artist = repository.getLastSearchArtist()
+        val artist = repository.getLastSearchQuery()
         if (artist.isEmpty()) {
              Log.w("HomeViewModel", "Cannot load page, last search artist is empty.")
              _uiState.update { it.copy(error = "Cannot load page, perform a search first.") }
@@ -123,7 +209,7 @@ class HomeViewModel @Inject constructor(
         // Clear the error before retrying
         _uiState.update { it.copy(error = null) }
         // Decide whether to retry search or page load based on current state
-        if (uiState.value.currentPage > 0 && repository.getLastSearchArtist().isNotEmpty()) {
+        if (uiState.value.currentPage > 0 && repository.getLastSearchQuery().isNotEmpty()) {
             loadPage(uiState.value.currentPage)
         } else if (searchText.value.isNotEmpty()){
             searchAlbums()
@@ -137,9 +223,18 @@ class HomeViewModel @Inject constructor(
  * 主页UI状态
  */
 data class HomeUiState(
-    val albums: List<Album> = emptyList(),
+    val albums: List<Album> = emptyList(), // 线上搜索结果
+    val localResults: List<LocalFileItem> = emptyList(), // 本地 AI 搜索结果
+    val topTags: List<String> = emptyList(),
+    val stats: AIStats = AIStats(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val currentPage: Int = 0,
     val totalPages: Int = 0
+)
+
+data class AIStats(
+    val totalIndexedItems: Int = 0,
+    val totalFacesDetected: Int = 0,
+    val totalObjectsDetected: Int = 0
 )
