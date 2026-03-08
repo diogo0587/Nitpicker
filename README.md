@@ -2,55 +2,67 @@
 
 [中文](README_zh.md) | **English**
 
-**Nitpicker is an Android application for browsing, viewing, and downloading images and videos from a website**
+**Nitpicker** is a powerful Android application designed not just as a media browser, but as a **Next-Generation Local Material Hub with Offline AI**. 
 
-## 📄 Disclaimer
-  * This software is intended solely for learning and exchanging knowledge about Android APIs. It does not store any file information. All content originates from the internet, and the author is not responsible for any of the content.
+Whether you are fetching media from online sources or managing massive local photo/video collections, Nitpicker automatically analyzes, indexes, and organizes your visual assets entirely on-device without internet reliance or privacy concerns.
+
+## ✨ Core Features
+
+### 🧠 On-Device AI Material Management (New!)
+*   **100% Offline Image Tagging**: Integrates Google’s bundled **ML Kit Image Labeling**, automatically detecting 400+ consumer-level entities (e.g., *Food, Indoor, Nature, Pets*) in your local albums without network requests.
+*   **Storage Access Framework (SAF) Integration**: Add entire local directories as your "Material Base." The app gains persistable permissions and reads files purely by URI—**Zero data copying, Zero extra storage taken.**
+*   **Smart Background Indexing**: Powered by Android `WorkManager`, your massive local albums are processed and indexed in the background. Tag counts and metadata are saved to a blazing-fast `Room` SQLite database.
+*   **Auto-Organized Home UI**: Say goodbye to a messy gallery! The Home Screen dynamically generates collections based on your top 7 most frequent AI tags, plus an "All Tags" cloud for immediate semantic-like search.
+
+### 🌐 Online Media Browser & Downloader
+*   Browse online albums and media lists efficiently.
+*   Filter files quickly by content type (Image / Video).
+*   **Batch Caching**: Multi-select support to asynchronously cache/download online materials to your local storage.
+*   Built-in Download Manager to track concurrent task progress and history.
+
+### 🎬 Advanced Media Viewing
+*   **Built-in Video Player**: Robust media playback with automatic playlist queuing and state-saving (remember where you left off).
+*   **Gesture-Rich Image Viewer**: Supports pinch-to-zoom, pan, double-tap zoom, and seamless horizontal swiping for immersive photo viewing.
 
 ---
 
-## ✨ Features
+## 🏗️ Technical Architecture Highlight
+Nitpicker demonstrates modern Android development standards:
+*   **100% Kotlin & Jetpack Compose**: Fully declarative UI with structured Navigation.
+*   **Coroutines & Flow**: Reactive architecture ensuring a junk-free UI while handling heavy database `StateFlow` connections.
+*   **Hilt / Dagger**: Dependency Injection across ViewModels, Repositories, and WorkManager.
+*   **SQLite Defense Strategies**: Advanced logic using `INSTR()` matching to correctly prune orphaned database tags when users externally delete files/folders (resolving the infamous URL-encoded `%` wildcard bug).
 
-*   Browse online albums and file lists
-*   Filter files by type (Image/Video)
-*   Supports multi-selection for batch caching (downloading)
-*   Built-in download manager to view caching progress and history
-*   Built-in video player with playlist support and state saving
-*   Built-in image viewer with gesture zoom/pan and swipe navigation
-
-This app was developed based on [bunkr-albums.io](https://bunkr-albums.io). Because of potential copyright risks, I didn't make the downloaded content appear directly in the phone's gallery. However, the app's directory:
-
-`Android/data/com.d3intran.nitpicker/files/Download/`
-
-contains all the downloaded videos. 
-Inside the app, you can **long-press** folders to rename them, or create/delete folders to manage videos. You can also enter a folder to select videos and move them elsewhere.
+---
 
 ## 🚀 Installation
 
-You can download the latest `app-release.apk` file directly from the **[GitHub Releases](https://github.com/d3intran/Nitpicker/releases)** page.
+You can download the latest `app-release.apk` directly from the **[GitHub Releases](https://github.com/d3intran/Nitpicker/releases)** page.
 
-1.  Go to the **[Releases page](https://github.com/d3intran/Nitpicker/releases)**. 
+1.  Navigate to the **[Releases page](https://github.com/d3intran/Nitpicker/releases)**. 
 2.  Download the `Nitpicker.apk` file from the latest release. 
-3.  On your Android device, you might need to enable "Install from unknown sources" to install the APK.
+3.  On your Android device, ensure "Install from unknown sources" is enabled.
 4.  Locate the downloaded APK file and tap to install.
 
+---
 
 ## 🤝 Contributing
 
 Contributions of all kinds are welcome!
-If you find a bug or have a feature suggestion, please feel free to create an [Issue](https://github.com/d3intran/Nitpicker/issues). <!-- TODO: Replace with your actual Issues page URL -->
 
-Alternatively, you can email me with a detailed description of the problem:
-d3intran@gmail.com
+*   If you encounter a bug or have a feature suggestion, please open an [Issue](https://github.com/d3intran/Nitpicker/issues).
+*   Or email me with a detailed description: `d3intran@gmail.com`
 
-If you want to contribute code:
-
+**To contribute code:**
 1.  Fork this repository.
-2.  Create a new branch (`git checkout -b feature/YourFeature`).
-3.  Make your changes and commit them (`git commit -m 'Add some feature'`).
-4.  Push your branch to your forked repository (`git push origin feature/YourFeature`).
-5.  Create a Pull Request.
+2.  Create a new branch (`git checkout -b feature/AmazingFeature`).
+3.  Commit your changes (`git commit -m 'Add AmazingFeature'`).
+4.  Push to the branch (`git push origin feature/AmazingFeature`).
+5.  Open a Pull Request.
 
-## 📄 License
+---
 
-This project is licensed under the [MIT License](LICENSE). Please see the `LICENSE` file for details.
+## 📄 License & Disclaimer
+
+*   **License**: This project is licensed under the [MIT License](LICENSE).
+*   **Disclaimer**: This application is built solely for educational purposes and learning Android APIs. It does not actively store server file information. All online content is retrieved from public APIs, and the author assumes no responsibility for third-party media content.
