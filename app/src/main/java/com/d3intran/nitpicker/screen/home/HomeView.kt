@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,7 +37,9 @@ import androidx.core.view.WindowCompat
 import androidx.navigation.NavController
 import com.d3intran.nitpicker.R
 import com.d3intran.nitpicker.model.Album
+import com.d3intran.nitpicker.model.SearchMode
 import com.d3intran.nitpicker.screen.home.HomeViewModel
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,239 +71,211 @@ fun HomeScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = homeBackgroundColor // Use the defined color
+        color = homeBackgroundColor
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding() // <-- Add padding for the status bar
-                .padding(horizontal = 16.dp), // Keep horizontal padding
-            horizontalAlignment = Alignment.CenterHorizontally
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            // --- Adjust Top Padding for the first Box ---
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // .padding(top = 16.dp, bottom = 8.dp) // Remove or reduce top padding here as statusBarsPadding handles it
-                    .padding(bottom = 8.dp) // Keep bottom padding if needed
-            ) {
-                IconButton(
-                    onClick = {
-                        Log.d("DrawerAction", "[${System.currentTimeMillis()}] HomeScreen: IconButton onClick triggered.")
-                        openDrawer()
-                    },
-                    modifier = Modifier.align(Alignment.CenterStart)
+            // --- Header ---
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = stringResource(R.string.home_open_drawer),
-                        tint = Color.White
+                    IconButton(
+                        onClick = {
+                            Log.d("DrawerAction", "[${System.currentTimeMillis()}] HomeScreen: IconButton onClick triggered.")
+                            openDrawer()
+                        },
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = stringResource(R.string.home_open_drawer),
+                            tint = Color.White
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.home_title),
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
-
-                Text(
-                    text = stringResource(R.string.home_title),
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.Center)
-                )
             }
-            // --- End Adjustment ---
 
-            // --- AI Stats Section ---
-            AIStatsSection(stats = uiState.stats, viewModel = homeViewModel)
+            // --- Removed AI Stats Section ---
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- Top Tags Section ---
-            if (uiState.topTags.isNotEmpty()) {
-                TopTagsSection(
-                    tags = uiState.topTags,
-                    onTagClick = { homeViewModel.updateSearchText(it) }
+            // --- Dynamic Top Tags Grid ---
+            item {
+                CategoryGridSection(
+                    topTags = uiState.allTagsWithCount.take(7),
+                    viewModel = homeViewModel,
+                    onNavigateToAllTags = { navController.navigate("all_tags_screen") }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // --- Search Bar ---
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
-            ) {
-                TextField(
-                    value = searchText,
-                    onValueChange = { homeViewModel.updateSearchText(it) },
-                    placeholder = { Text("Search by tag (e.g., Cat, Face...)") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        unfocusedTextColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedContainerColor = Color(0xFF252525),
-                        focusedContainerColor = Color(0xFF252525),
-                        unfocusedPlaceholderColor = Color(0xFFAAAAAA),
-                        focusedPlaceholderColor = Color(0xFFAAAAAA),
-                        cursorColor = Color(0xFF6D28D9),
-                        focusedIndicatorColor = Color(0xFF6D28D9),
-                        unfocusedIndicatorColor = Color(0xFF333333)
-                    ),
-                    shape = RoundedCornerShape(50),
-                    singleLine = true
-                )
-
-                if (searchText.isNotEmpty()) {
-                    Button(
-                        onClick = { homeViewModel.searchAlbums() },
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 4.dp)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6D28D9),
-                            contentColor = Color.White
-                        )
+            // --- Search Section ---
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                    TabRow(
+                        selectedTabIndex = if (uiState.searchMode == SearchMode.LOCAL) 0 else 1,
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White,
+                        indicator = { tabPositions ->
+                            TabRowDefaults.Indicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[if (uiState.searchMode == SearchMode.LOCAL) 0 else 1]),
+                                color = Color(0xFF6D28D9)
+                            )
+                        },
+                        modifier = Modifier.padding(bottom = 8.dp)
                     ) {
-                        Text("Search Online", fontSize = 12.sp)
+                        Tab(
+                            selected = uiState.searchMode == SearchMode.LOCAL,
+                            onClick = { homeViewModel.setSearchMode(SearchMode.LOCAL) },
+                            text = { Text("Local AI") }
+                        )
+                        Tab(
+                            selected = uiState.searchMode == SearchMode.ONLINE,
+                            onClick = { homeViewModel.setSearchMode(SearchMode.ONLINE) },
+                            text = { Text("Online Albums") }
+                        )
                     }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        TextField(
+                            value = searchText,
+                            onValueChange = { homeViewModel.updateSearchText(it) },
+                            placeholder = {
+                                Text(if (uiState.searchMode == SearchMode.LOCAL) "Search local AI tags/faces..." else "Search online albums...")
+                            },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                unfocusedTextColor = Color.White,
+                                focusedTextColor = Color.White,
+                                unfocusedContainerColor = Color(0xFF252525),
+                                focusedContainerColor = Color(0xFF252525),
+                                unfocusedPlaceholderColor = Color(0xFFAAAAAA),
+                                focusedPlaceholderColor = Color(0xFFAAAAAA),
+                                cursorColor = Color(0xFF6D28D9),
+                                focusedIndicatorColor = Color(0xFF6D28D9),
+                                unfocusedIndicatorColor = Color(0xFF333333)
+                            ),
+                            shape = RoundedCornerShape(50),
+                            singleLine = true
+                        )
+                        if (searchText.isNotEmpty()) {
+                            Button(
+                                onClick = { homeViewModel.executeSearch() },
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(end = 4.dp)
+                                    .height(40.dp),
+                                shape = RoundedCornerShape(50),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF6D28D9),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Search", fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // --- Status text ---
+            if (uiState.currentPage > 0) {
+                item {
+                    Text(
+                        text = if (uiState.totalPages <= 1)
+                            stringResource(R.string.home_page_info_count, uiState.albums.size)
+                        else
+                            stringResource(R.string.home_page_info_pages, uiState.currentPage, uiState.totalPages),
+                        color = Color(0xFFAAAAAA),
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 }
             }
 
-            if (uiState.currentPage > 0) {
-                Text(
-                    text = if (uiState.totalPages <= 1)
-                        stringResource(R.string.home_page_info_count, uiState.albums.size)
-                    else
-                        stringResource(R.string.home_page_info_pages, uiState.currentPage, uiState.totalPages),
-                    color = Color(0xFFAAAAAA),
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-
-            Box(modifier = Modifier.weight(1f).padding(top = 8.dp)) {
-                when {
-                    uiState.isLoading -> {
+            // --- Results ---
+            when {
+                uiState.isLoading -> {
+                    item {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxWidth().height(200.dp),
                             contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = Color(0xFF6D28D9))
-                        }
+                        ) { CircularProgressIndicator(color = Color(0xFF6D28D9)) }
                     }
-
-                    uiState.error != null -> {
+                }
+                uiState.error != null -> {
+                    item {
                         Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = errorTitle,
-                                color = Color.White
-                            )
-                            Text(
-                                text = uiState.error ?: unknownError,
-                                color = Color(0xFFAAAAAA),
-                                fontSize = 14.sp
-                            )
+                            Text(text = errorTitle, color = Color.White)
+                            Text(text = uiState.error ?: unknownError, color = Color(0xFFAAAAAA), fontSize = 14.sp)
                             Spacer(modifier = Modifier.height(16.dp))
                             Button(
                                 onClick = { homeViewModel.retry() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF6D28D9)
-                                )
-                            ) {
-                                Text(stringResource(R.string.action_retry))
-                            }
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6D28D9))
+                            ) { Text(stringResource(R.string.action_retry)) }
                         }
                     }
-
-                    uiState.albums.isEmpty() && uiState.currentPage > 0 -> {
+                }
+                uiState.localResults.isNotEmpty() -> {
+                    item {
+                        Text("Local AI Insights", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
+                    }
+                    items(uiState.localResults) { result ->
+                        val index = uiState.localResults.indexOf(result)
+                        LocalSearchResultItem(result) {
+                            homeViewModel.openMedia(index)
+                            navController.navigate("media_viewer?uri=")
+                        }
+                    }
+                }
+                uiState.albums.isNotEmpty() -> {
+                    item {
+                        Text("Online Albums", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(bottom = 8.dp))
+                    }
+                    items(items = uiState.albums, key = { it.url }) { album ->
+                        AlbumItem(album = album, onAlbumClick = { clickedAlbum ->
+                            val encodedUrl = java.net.URLEncoder.encode(clickedAlbum.url, "UTF-8")
+                            val encodedTitle = java.net.URLEncoder.encode(clickedAlbum.title, "UTF-8")
+                            navController.navigate("album_screen/$encodedUrl/$encodedTitle")
+                        })
+                    }
+                }
+                uiState.currentPage == 0 && !uiState.isLoading && uiState.error == null -> {
+                    item {
                         Box(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxWidth().height(120.dp),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = noResultsText,
-                                color = Color(0xFFAAAAAA)
-                            )
-                        }
-                    }
-
-                    uiState.localResults.isNotEmpty() || uiState.albums.isNotEmpty() -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (uiState.localResults.isNotEmpty()) {
-                                item {
-                                    Text(
-                                        "Local AI Insights",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp,
-                                        modifier = Modifier.padding(bottom = 8.dp)
-                                    )
-                                }
-                                items(uiState.localResults) { result ->
-                                    LocalSearchResultItem(result) {
-                                        // Navigate to viewer (assuming existing route or similar)
-                                        val encodedUri = java.net.URLEncoder.encode(result.path, "UTF-8")
-                                        navController.navigate("media_viewer/$encodedUri")
-                                    }
-                                }
-                                if (uiState.albums.isNotEmpty()) {
-                                    item {
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Divider(color = Color(0xFF333333), thickness = 1.dp)
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text(
-                                            "Online Albums",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp,
-                                            modifier = Modifier.padding(bottom = 8.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            items(
-                                items = uiState.albums,
-                                key = { album -> album.url }
-                            ) { album ->
-                                AlbumItem(album = album, onAlbumClick = { clickedAlbum ->
-                                    val encodedUrl = java.net.URLEncoder.encode(clickedAlbum.url, "UTF-8")
-                                    val encodedTitle = java.net.URLEncoder.encode(clickedAlbum.title, "UTF-8")
-                                    navController.navigate("album_screen/$encodedUrl/$encodedTitle")
-                                })
-                            }
-                        }
-                    }
-
-                    uiState.albums.isEmpty() && uiState.localResults.isEmpty() && uiState.currentPage == 0 && !uiState.isLoading && uiState.error == null -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Search to discover AI insights or online materials",
-                                color = Color(0xFFAAAAAA)
-                            )
-                        }
+                        ) { Text("Search to discover AI insights or browse categories above", color = Color(0xFFAAAAAA), textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
                     }
                 }
             }
 
+            // --- Pagination ---
             if (uiState.totalPages > 1) {
-                PaginationControls(
-                    currentPage = uiState.currentPage,
-                    totalPages = uiState.totalPages,
-                    onPageSelected = { homeViewModel.loadPage(it) }
-                )
+                item {
+                    PaginationControls(
+                        currentPage = uiState.currentPage,
+                        totalPages = uiState.totalPages,
+                        onPageSelected = { homeViewModel.loadPage(it) }
+                    )
+                }
             }
         }
     }
@@ -488,86 +463,95 @@ private fun calculateVisiblePages(currentPage: Int, totalPages: Int): Pair<Int, 
     return Pair(startPage, endPage)
 }
 
-@Composable
-fun AIStatsSection(stats: com.d3intran.nitpicker.screen.home.AIStats, viewModel: HomeViewModel) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        StatCard(
-            modifier = Modifier.weight(1f),
-            label = "Indexed",
-            value = stats.totalIndexedItems.toString(),
-            icon = Icons.Default.Image,
-            color = Color(0xFF6D28D9),
-            onClick = { viewModel.updateSearchText("") }
-        )
-        StatCard(
-            modifier = Modifier.weight(1f),
-            label = "Faces",
-            value = stats.totalFacesDetected.toString(),
-            icon = Icons.Default.Face,
-            color = Color(0xFFF59E0B),
-            onClick = { viewModel.showFaces() }
-        )
-        StatCard(
-            modifier = Modifier.weight(1f),
-            label = "Objects",
-            value = stats.totalObjectsDetected.toString(),
-            icon = Icons.Default.Analytics,
-            color = Color(0xFF10B981),
-            onClick = { viewModel.showObjects() }
-        )
-    }
-}
+
+
+// Category data class
+data class CategoryItem(
+    val label: String,
+    val emoji: String,
+    val color: Long,
+    val count: Int? = null,
+    val action: () -> Unit
+)
 
 @Composable
-fun StatCard(
-    modifier: Modifier,
-    label: String,
-    value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color,
-    onClick: () -> Unit = {}
+fun CategoryGridSection(
+    topTags: List<Pair<String, Int>>,
+    viewModel: HomeViewModel,
+    onNavigateToAllTags: () -> Unit
 ) {
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+    // Generate a fixed palette for the dynamic tags
+    val colors = listOf(0xFF6D28D9, 0xFF0D9488, 0xFFDC2626, 0xFF16A34A, 0xFF2563EB, 0xFFEA580C, 0xFFD97706)
+    
+    // Take exactly 7 tags (or less if not enough exist)
+    val dynamicTags = topTags.take(7)
+    
+    // Map them to CategoryItem format
+    val categories = dynamicTags.mapIndexed { index, tagPair ->
+        CategoryItem(
+            label = tagPair.first.replaceFirstChar { it.uppercase() },
+            emoji = "\uD83C\uDFF7", // Generic tag emoji
+            color = colors[index % colors.size],
+            count = tagPair.second
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            Text(text = label, color = Color(0xFFAAAAAA), fontSize = 12.sp)
+            viewModel.setSearchMode(SearchMode.LOCAL)
+            viewModel.updateSearchText(tagPair.first)
+            viewModel.executeSearch()
         }
-    }
-}
+    }.toMutableList()
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun TopTagsSection(tags: List<String>, onTagClick: (String) -> Unit) {
-    Column {
-        Text("Quick Filter", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-        Spacer(modifier = Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(tags) { tag ->
-                InputChip(
-                    selected = false,
-                    onClick = { onTagClick(tag) },
-                    label = { Text(tag) },
-                    leadingIcon = { Icon(Icons.Default.LocalOffer, contentDescription = null, modifier = Modifier.size(14.dp)) },
-                    colors = InputChipDefaults.inputChipColors(
-                        containerColor = Color(0xFF252525),
-                        labelColor = Color.White,
-                        leadingIconColor = Color(0xFF6D28D9)
-                    ),
-                    border = null,
-                    shape = RoundedCornerShape(50)
-                )
+    // Always append the "All Tags" button at the end
+    categories.add(
+        CategoryItem("All Tags", "\uD83D\uDCDC", 0xFF64748B, null) { onNavigateToAllTags() }
+    )
+
+    Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+        Text(
+            "Top AI Tags",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+        categories.chunked(2).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                rowItems.forEach { cat ->
+                    Card(
+                        onClick = cat.action,
+                        modifier = Modifier.weight(1f).height(72.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(cat.color).copy(alpha = 0.18f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(cat.emoji, fontSize = 26.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    cat.label,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                                if (cat.count != null) {
+                                    Text(
+                                        "${cat.count} items",
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                if (rowItems.size == 1) Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
@@ -580,8 +564,10 @@ fun LocalSearchResultItem(item: com.d3intran.nitpicker.model.LocalFileItem, onCl
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Row(modifier = Modifier.fillMaxSize().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            // Placeholder for thumbnail
+        Row(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(
                 modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF252525)),
                 contentAlignment = Alignment.Center
@@ -593,9 +579,7 @@ fun LocalSearchResultItem(item: com.d3intran.nitpicker.model.LocalFileItem, onCl
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
             }
-            
             Spacer(modifier = Modifier.width(16.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.path.substringAfterLast('/'), color = Color.White, fontWeight = FontWeight.Medium, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(modifier = Modifier.height(4.dp))
@@ -605,7 +589,6 @@ fun LocalSearchResultItem(item: com.d3intran.nitpicker.model.LocalFileItem, onCl
                     }
                 }
             }
-
             if (item.faceCount > 0) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Face, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(14.dp))
@@ -615,3 +598,4 @@ fun LocalSearchResultItem(item: com.d3intran.nitpicker.model.LocalFileItem, onCl
         }
     }
 }
+

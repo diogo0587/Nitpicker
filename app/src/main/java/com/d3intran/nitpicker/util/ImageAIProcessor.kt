@@ -4,106 +4,97 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
-import com.google.mlkit.vision.objects.ObjectDetection
-import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import java.io.InputStream
-import javax.inject.Inject
-import javax.inject.Singleton
+import com.google.mlkit.vision.label.ImageLabeling
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
-/**
- * 图像 AI 处理类。
- * 使用 Google ML Kit 在本地进行快速的人脸检测和物体识别，
- * 作为发送给 Gemini API 之前的预处理步骤。
- */
-@Singleton
-class ImageAIProcessor @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
-    // 初始化人脸检测器 (性能模式：快速)
-    private val faceDetector = FaceDetection.getClient(
-        FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .build()
-    )
+data class AnalysisResult(
+    val labels: List<String>,
+    val faceCount: Int
+)
 
-    // 初始化物体检测器 (单图模式，启用多分类)
-    private val objectDetector = ObjectDetection.getClient(
-        ObjectDetectorOptions.Builder()
-            .setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE)
-            .enableMultipleObjects()
-            .enableClassification()
-            .build()
-    )
+object ImageAIProcessor {
+
+    private const val CONFIDENCE_THRESHOLD = 0.6f
+    private const val TAG = "ImageAIProcessor"
 
     /**
-     * 异步分析图像，提取人脸数、物体数和本地标签。
+     * Analyzes an image URI using the BUNDLED default ML Kit Image Labeler.
+     * This uses Google's standard 400+ class model which is excellent for consumer photos
+     * (e.g., "Sky", "Person", "Pet", "Food").
+     * Since we use `com.google.mlkit:image-labeling`, the model is packaged directly in the APK,
+     * so it works 100% offline without needing a first-time Play Services download.
      */
-    suspend fun analyzeImage(uri: Uri): AnalysisResult = withContext(Dispatchers.IO) {
-        val bitmap = loadBitmapFromUri(uri) ?: return@withContext AnalysisResult(0, 0, emptyList())
-        val image = InputImage.fromBitmap(bitmap, 0)
+    suspend fun analyzeImage(context: Context, imageUri: Uri): AnalysisResult {
+        return try {
+            val options = ImageLabelerOptions.Builder()
+                .setConfidenceThreshold(CONFIDENCE_THRESHOLD)
+                .build()
 
-        return@withContext try {
-            val faces = faceDetector.process(image).await()
-            val objects = objectDetector.process(image).await()
+            val labeler = ImageLabeling.getClient(options)
 
-            val labels = objects.flatMap { obj ->
-                obj.labels.map { it.text }
-            }.distinct()
+            val bitmap = loadScaledBitmap(context, imageUri) ?: return AnalysisResult(emptyList(), 0)
+            val inputImage = InputImage.fromBitmap(bitmap, 0)
 
-            AnalysisResult(
-                faceCount = faces.size,
-                objectCount = objects.size,
-                localLabels = labels
-            )
+            val labels = suspendCancellableCoroutine { continuation ->
+                labeler.process(inputImage)
+                    .addOnSuccessListener { results ->
+                        val labelNames = results.map { it.text }
+                        Log.d(TAG, "Labels for $imageUri: $labelNames")
+                        continuation.resume(labelNames)
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e(TAG, "Labeling failed for $imageUri", e)
+                        continuation.resumeWithException(e)
+                    }
+            }
+
+            labeler.close()
+            bitmap.recycle()
+
+            AnalysisResult(labels = labels, faceCount = 0)
         } catch (e: Exception) {
-            AnalysisResult(0, 0, emptyList())
+            Log.e(TAG, "analyzeImage error", e)
+            AnalysisResult(emptyList(), 0)
         }
     }
 
-    /**
-     * 从 Uri 加载并压缩 Bitmap，防止内存溢出 (OOM)。
-     */
-    private fun loadBitmapFromUri(uri: Uri): Bitmap? {
+    private fun loadScaledBitmap(context: Context, uri: Uri): Bitmap? {
         return try {
-            val options = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-            context.contentResolver.openInputStream(uri)?.use { 
-                BitmapFactory.decodeStream(it, null, options) 
-            }
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val opts = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeStream(stream, null, opts)
 
-            // 设定分析时的最大边长为 1024 像素
-            val targetSize = 1024
-            var inSampleSize = 1
-            if (options.outHeight > targetSize || options.outWidth > targetSize) {
-                val halfHeight = options.outHeight / 2
-                val halfWidth = options.outWidth / 2
-                while (halfHeight / inSampleSize >= targetSize && halfWidth / inSampleSize >= targetSize) {
-                    inSampleSize *= 2
+                val maxDim = 640
+                opts.inSampleSize = calculateInSampleSize(opts, maxDim, maxDim)
+                opts.inJustDecodeBounds = false
+
+                context.contentResolver.openInputStream(uri)?.use { s2 ->
+                    BitmapFactory.decodeStream(s2, null, opts)
                 }
             }
-
-            val decodeOptions = BitmapFactory.Options().apply {
-                inSampleSize = inSampleSize
-            }
-            context.contentResolver.openInputStream(uri)?.use { 
-                BitmapFactory.decodeStream(it, null, decodeOptions) 
-            }
         } catch (e: Exception) {
+            Log.e(TAG, "Failed to load bitmap from $uri", e)
             null
         }
     }
 
-    data class AnalysisResult(
-        val faceCount: Int,
-        val objectCount: Int,
-        val localLabels: List<String>
-    )
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height, width) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
+    }
 }

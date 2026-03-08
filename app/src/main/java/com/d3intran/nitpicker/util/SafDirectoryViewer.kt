@@ -41,13 +41,14 @@ object SafDirectoryViewer {
 
         try {
             context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                val mimeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                val sizeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
-                val lastModifiedIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                val idIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val lastModifiedIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
 
                 while (cursor.moveToNext()) {
+                    if (idIndex == -1 || nameIndex == -1 || mimeIndex == -1) continue
                     val documentId = cursor.getString(idIndex)
                     val name = cursor.getString(nameIndex) ?: "Unknown"
                     val mimeType = cursor.getString(mimeIndex) ?: ""
@@ -56,8 +57,8 @@ object SafDirectoryViewer {
                         continue // Skip subdirectories for now
                     }
 
-                    val size = if (!cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else 0L
-                    val lastModified = if (!cursor.isNull(lastModifiedIndex)) cursor.getLong(lastModifiedIndex) else 0L
+                    val size = if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else 0L
+                    val lastModified = if (lastModifiedIndex != -1 && !cursor.isNull(lastModifiedIndex)) cursor.getLong(lastModifiedIndex) else 0L
 
                     val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
                     

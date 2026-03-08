@@ -42,6 +42,7 @@ android {
     }
 }
 
+
 dependencies {
 
     implementation(libs.androidx.room.runtime)
@@ -94,8 +95,8 @@ dependencies {
     // DataStore for saving SAF Uris
     implementation(libs.androidx.datastore.preferences)
 
-    // ML Kit for local AI processing
-    implementation(libs.mlkit.objectDetection)
+    // ML Kit for local AI processing (Bundled Default Model)
+    implementation(libs.mlkit.imageLabeling)
     implementation(libs.mlkit.faceDetection)
     implementation(libs.kotlinx.coroutines.play.services)
 

@@ -8,7 +8,9 @@ import com.d3intran.nitpicker.db.MediaMetadataDao
 import com.d3intran.nitpicker.model.Album
 import com.d3intran.nitpicker.model.FileType
 import com.d3intran.nitpicker.model.LocalFileItem
+import com.d3intran.nitpicker.model.SearchMode
 import com.d3intran.nitpicker.repository.MediaRepository
+import com.d3intran.nitpicker.util.MediaSessionHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -21,7 +23,8 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: MediaRepository,
-    private val mediaMetadataDao: MediaMetadataDao
+    private val mediaMetadataDao: MediaMetadataDao,
+    private val mediaSessionHolder: MediaSessionHolder
 ) : ViewModel() {
     
     // UI状态
@@ -45,10 +48,12 @@ class HomeViewModel @Inject constructor(
                 
                 // 获取热门标签
                 val allTags = allMetadata.flatMap { it.tags }
-                val topTags = allTags.groupingBy { it }
+                val allTagsWithCount = allTags.groupingBy { it }
                     .eachCount()
                     .toList()
                     .sortedByDescending { it.second }
+
+                val topTags = allTagsWithCount
                     .take(10)
                     .map { it.first }
 
@@ -58,7 +63,8 @@ class HomeViewModel @Inject constructor(
                         totalFacesDetected = totalFaces,
                         totalObjectsDetected = totalObjects
                     ),
-                    topTags = topTags
+                    topTags = topTags,
+                    allTagsWithCount = allTagsWithCount
                 ) }
             }
             .launchIn(viewModelScope)
@@ -69,11 +75,23 @@ class HomeViewModel @Inject constructor(
      */
     fun updateSearchText(text: String) {
         _searchText.value = text
-        // 当文本改变时同步搜索本地
-        if (text.length >= 2) {
-            searchLocalAI(text)
-        } else if (text.isEmpty()) {
-            _uiState.update { it.copy(localResults = emptyList()) }
+        if (text.isEmpty()) {
+            _uiState.update { it.copy(localResults = emptyList(), albums = emptyList()) }
+        }
+    }
+
+    fun setSearchMode(mode: SearchMode) {
+        _uiState.update { it.copy(searchMode = mode) }
+    }
+
+    fun executeSearch() {
+        val query = _searchText.value.trim()
+        if (query.isEmpty()) return
+        
+        if (_uiState.value.searchMode == SearchMode.LOCAL) {
+            searchLocalAI(query)
+        } else {
+            searchAlbums()
         }
     }
 
@@ -84,26 +102,77 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 显示所有检测到人脸的媒体
-     */
+    /** 显示所有已索引媒体 */
+    fun showAll() {
+        _searchText.value = "All Indexed"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getAllMetadata().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
     fun showFaces() {
-        _searchText.value = "Faces"
+        _searchText.value = "People"
         viewModelScope.launch {
             val results = mediaMetadataDao.getMetadataWithFaces().first()
             _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
         }
     }
 
-    /**
-     * 显示所有检测到物体的媒体
-     */
-    fun showObjects() {
-        _searchText.value = "Objects"
+    fun showAnimals() {
+        _searchText.value = "Animals"
         viewModelScope.launch {
-            val results = mediaMetadataDao.getMetadataWithObjects().first()
+            val results = mediaMetadataDao.getMetadataAnimals().first()
             _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
         }
+    }
+
+    fun showFood() {
+        _searchText.value = "Food"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getMetadataFood().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    fun showNature() {
+        _searchText.value = "Nature"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getMetadataNature().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    fun showArchitecture() {
+        _searchText.value = "Architecture"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getMetadataArchitecture().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    fun showVehicles() {
+        _searchText.value = "Vehicles"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getMetadataVehicles().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    fun showUnlabeled() {
+        _searchText.value = "Unlabeled"
+        viewModelScope.launch {
+            val results = mediaMetadataDao.getMetadataUnlabeled().first()
+            _uiState.update { it.copy(localResults = mapMetadataToLocalFiles(results)) }
+        }
+    }
+
+    /**
+     * 打开指定媒体到全屏查看器（支持左右滑动）
+     */
+    fun openMedia(index: Int) {
+        mediaSessionHolder.mediaUris = _uiState.value.localResults.map { it.path }
+        mediaSessionHolder.currentIndex = index
     }
 
     private fun mapMetadataToLocalFiles(results: List<com.d3intran.nitpicker.db.MediaMetadataEntity>): List<LocalFileItem> {
@@ -226,7 +295,9 @@ data class HomeUiState(
     val albums: List<Album> = emptyList(), // 线上搜索结果
     val localResults: List<LocalFileItem> = emptyList(), // 本地 AI 搜索结果
     val topTags: List<String> = emptyList(),
+    val allTagsWithCount: List<Pair<String, Int>> = emptyList(),
     val stats: AIStats = AIStats(),
+    val searchMode: SearchMode = SearchMode.LOCAL,
     val isLoading: Boolean = false,
     val error: String? = null,
     val currentPage: Int = 0,

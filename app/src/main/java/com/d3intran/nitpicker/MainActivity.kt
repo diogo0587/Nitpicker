@@ -41,6 +41,8 @@ import com.d3intran.nitpicker.screen.files.FilesScreen
 import com.d3intran.nitpicker.screen.local_album.LocalAlbumScreen
 import com.d3intran.nitpicker.screen.player.PlayerScreen
 import com.d3intran.nitpicker.screen.image.ImageViewerScreen
+import com.d3intran.nitpicker.screen.home.AllTagsScreen
+import com.d3intran.nitpicker.screen.player.MediaViewerScreen
 import com.d3intran.nitpicker.ui.theme.NitpickerTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -192,12 +194,21 @@ class MainActivity : ComponentActivity() {
                             .navigationBarsPadding(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        NavHost(navController = navController, startDestination = "files_screen") {
+                        NavHost(navController = navController, startDestination = "home_screen") {
                             composable("home_screen") {
                                 HomeScreen(
                                     homeViewModel = hiltViewModel(),
                                     navController = navController,
                                     openDrawer = { scope.launch { drawerState.open() } }
+                                )
+                            }
+                            composable("all_tags_screen") { backStackEntry ->
+                                val homeEntry = remember(backStackEntry) {
+                                    navController.getBackStackEntry("home_screen")
+                                }
+                                AllTagsScreen(
+                                    viewModel = hiltViewModel(homeEntry),
+                                    navController = navController
                                 )
                             }
                             composable("download_screen") { DownloadScreen(navController = navController) }
@@ -237,6 +248,28 @@ class MainActivity : ComponentActivity() {
                                 )
                             ) { backStackEntry ->
                                 ImageViewerScreen(navController = navController)
+                            }
+                            
+                            composable(
+                                route = "media_viewer?uri={encodedUri}",
+                                arguments = listOf(
+                                    navArgument("encodedUri") { 
+                                        type = NavType.StringType
+                                        defaultValue = ""
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val encodedUri = backStackEntry.arguments?.getString("encodedUri") ?: ""
+                                // Base64 decode to safely handle content:// URIs with special characters
+                                val decodedUri = try {
+                                    String(android.util.Base64.decode(encodedUri, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP))
+                                } catch (e: Exception) {
+                                    encodedUri // fallback
+                                }
+                                MediaViewerScreen(
+                                    navController = navController,
+                                    mediaUriString = decodedUri
+                                )
                             }
                         }
                     }

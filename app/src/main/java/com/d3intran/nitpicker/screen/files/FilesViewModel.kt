@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.d3intran.nitpicker.db.MediaMetadataDao
 
 data class FolderItem(
     val name: String,
@@ -36,7 +37,8 @@ data class FilesUiState(
 @HiltViewModel
 class FilesViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val safRepository: SafRepository
+    private val safRepository: SafRepository,
+    private val mediaMetadataDao: MediaMetadataDao
 ) : ViewModel() {
 
     private val workManager = WorkManager.getInstance(context)
@@ -60,7 +62,7 @@ class FilesViewModel @Inject constructor(
                     
                     val folderItems = uris.mapNotNull { uri ->
                         val documentFile = DocumentFile.fromTreeUri(context, uri)
-                        if (documentFile != null && documentFile.exists()) {
+                        if (documentFile != null && documentFile.exists() && documentFile.canRead()) {
                             // 确保每个已授权的目录都在后台进行索引扫描（使用 KEEP 避免重复任务）
                             enqueueIndexingWorker(uri, ExistingWorkPolicy.KEEP)
                             
@@ -69,7 +71,14 @@ class FilesViewModel @Inject constructor(
                                 path = uri.toString()
                             )
                         } else {
-                            Log.w("FilesViewModel", "Document file missing or invalid for URI: $uri")
+                            Log.w("FilesViewModel", "Document folder missing or access revoked: $uri. Cleaning up database.")
+                            // The folder was deleted externally or permissions revoked
+                            viewModelScope.launch {
+                                // Remove from remembered URIs
+                                safRepository.removeDirectory(uri)
+                                // Clean up all AI database tags associated with files in this folder
+                                mediaMetadataDao.deleteMetadataByPrefix(uri.toString())
+                            }
                             null
                         }
                     }.sortedBy { it.name }
@@ -107,6 +116,10 @@ class FilesViewModel @Inject constructor(
     fun removeFolder(uriString: String) {
         viewModelScope.launch {
             try {
+                // Delete tags for all files within this directory from the local DB
+                mediaMetadataDao.deleteMetadataByPrefix(uriString)
+                
+                // Relinquish exact URI permissions and stop tracking
                 safRepository.removeDirectory(Uri.parse(uriString))
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Failed to remove directory: ${e.message}") }

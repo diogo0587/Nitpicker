@@ -24,7 +24,7 @@ profileinstaller = "1.4.1"
 media3 = "1.6.1"
 splashscreen = "1.0.1"
 zoomable = "1.6.0"
-mlkitObjectDetection = "17.0.2"
+mlkitImageLabeling = "17.0.7"
 mlkitFaceDetection = "16.1.7"
 kotlinxCoroutinesPlayServices = "1.7.3"
 workRuntime = "2.9.1"
@@ -71,7 +71,7 @@ androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profi
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-documentfile = { group = "androidx.documentfile", name = "documentfile", version = "1.0.1" }
 zoomable = { module = "net.engawapg.lib:zoomable", version.ref = "zoomable" }
-mlkit-objectDetection = { group = "com.google.mlkit", name = "object-detection", version.ref = "mlkitObjectDetection" }
+mlkit-imageLabeling = { group = "com.google.mlkit", name = "image-labeling", version.ref = "mlkitImageLabeling" }
 mlkit-faceDetection = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkitFaceDetection" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesPlayServices" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntime" }

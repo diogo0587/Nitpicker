@@ -23,9 +23,9 @@ import dagger.assisted.AssistedInject
 class MediaTaggingWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val imageAIProcessor: ImageAIProcessor,
     private val mediaMetadataDao: MediaMetadataDao
 ) : CoroutineWorker(appContext, workerParams) {
+
 
     override suspend fun doWork(): Result {
         val folderUriString = inputData.getString("folderUri") ?: return Result.failure()
@@ -36,9 +36,22 @@ class MediaTaggingWorker @AssistedInject constructor(
         return try {
             // 获取目录下所有文件
             val files = SafDirectoryViewer.listFilesFromUri(applicationContext, folderUri)
+            val currentFileUris = files.map { it.path }.toSet()
+            
+            // 1. Sync & Cleanup: Find records in DB for this folder that no longer exist on disk
+            val dbUris = mediaMetadataDao.getUrisByPrefix(folderUriString)
+            val missingUris = dbUris.filter { !currentFileUris.contains(it) }
+            if (missingUris.isNotEmpty()) {
+                Log.d("MediaTaggingWorker", "Found ${missingUris.size} orphaned entries in $folderUriString. Deleting...")
+                missingUris.forEach { 
+                    mediaMetadataDao.deleteMetadata(it) 
+                }
+            }
+
             val totalFiles = files.size
             var processedCount = 0
 
+            // 2. Index new items
             files.forEach { fileItem ->
                 // 目前仅对图片进行本地 AI 分析
                 if (fileItem.type == com.d3intran.nitpicker.model.FileType.IMAGE) {
@@ -46,19 +59,19 @@ class MediaTaggingWorker @AssistedInject constructor(
                     
                     // 如果尚未处理，则运行分析
                     if (existing == null) {
-                        val result = imageAIProcessor.analyzeImage(Uri.parse(fileItem.path))
+                        val result = ImageAIProcessor.analyzeImage(applicationContext, Uri.parse(fileItem.path))
                         
                         val entity = MediaMetadataEntity(
                             uri = fileItem.path,
-                            tags = result.localLabels,
-                            description = "Local ML Kit Scan",
+                            tags = result.labels,
+                            description = "ML Kit Image Labeling",
                             faceCount = result.faceCount,
-                            objectCount = result.objectCount,
-                            isProcessed = false, // 设为 false，表示尚未经过 Gemini 深度处理
+                            objectCount = result.labels.size, // label count as proxy
+                            isProcessed = false,
                             lastUpdated = System.currentTimeMillis()
                         )
                         mediaMetadataDao.insertMetadata(entity)
-                        Log.d("MediaTaggingWorker", "Indexed: ${fileItem.name} (Faces: ${result.faceCount})")
+                        Log.d("MediaTaggingWorker", "Indexed: ${fileItem.name} | faces:${result.faceCount} | labels:${result.labels}")
                     }
                 }
                 
@@ -67,7 +80,7 @@ class MediaTaggingWorker @AssistedInject constructor(
                 setProgress(workDataOf("progress" to (processedCount * 100 / totalFiles)))
             }
 
-            Log.d("MediaTaggingWorker", "Indexing completed for: $folderUriString")
+            Log.d("MediaTaggingWorker", "Indexing & Cleanup completed for: $folderUriString")
             Result.success()
         } catch (e: Exception) {
             Log.e("MediaTaggingWorker", "Error during background indexing", e)
